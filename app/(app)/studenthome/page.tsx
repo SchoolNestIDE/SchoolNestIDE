@@ -95,7 +95,7 @@ export default function Page() {
             icon: (
                 <IconBrandPython className="h-full w-full text-neutral-500 dark:text-neutral-300" />
             ),
-            href: "/studenthome/linux",
+            href: "/studenthome/python",
         },
         {
             title: "C++",
