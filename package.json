@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node utils/generateHashes.mjs public && next dev",
+    "dev": "node utils/generateHashes.mjs public && next dev --experimental-https",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

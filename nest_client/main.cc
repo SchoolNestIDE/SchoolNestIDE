@@ -68,10 +68,8 @@ int virt_to_phys_user(uintptr_t *paddr, pid_t pid, uintptr_t vaddr) {
         (entry.pfn * sysconf(_SC_PAGE_SIZE)) + (vaddr % sysconf(_SC_PAGE_SIZE));
     return 0;
 }
-int server_sock_loop() {
-  int sock = socket(AF_UNIX, SOCK_STREAM, 0);
-  const char* pathname = "/run/nest.sock";
-
+int handle_openpty() {
+  
 }
 int send_usrmsg() {
 

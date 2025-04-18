@@ -7,6 +7,7 @@ mkfs.ext4 ../public/disk
 MOUNT_DIR=$(mktemp -d)
 sudo mount ../public/disk "$MOUNT_DIR"
 sudo tar -C "$MOUNT_DIR" -xvf output.tar
+g++ -m32 -static ../nest_client/*.cc -o /mnt/usr/bin/nest_client
 sudo umount "$MOUNT_DIR"
 
 echo "Compressing disk"

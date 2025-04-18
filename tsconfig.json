@@ -33,7 +33,7 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts"
-  ],
+, "webpreview/sw.mts"  ],
   "exclude": [
     "node_modules"
   ]

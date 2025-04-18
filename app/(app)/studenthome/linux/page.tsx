@@ -6,8 +6,9 @@ import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import * as ps from 'path';
 import { urlToHttpOptions } from 'url';
-const mimeType = require('mime-types');
 
+const mimeType = require('mime-types');
+const DOWNLOAD_PREFIX = ""
 declare global {
   const Filer: any;
   module globalThis {
@@ -84,12 +85,13 @@ function select(news) {
   news.style.backgroundColor = "gray";
 }
 const newNameTemplate = "New Document";
+
 function createNewFile() {
   let pat = "/"
 
-
+  if (select.selected){
   pat = select.selected.getAttribute('data-path');
-
+  }
   console.log(pat);
   function foundTargetDirectory(target: string, num: number) {
 
@@ -133,6 +135,13 @@ function createNewFile() {
 contextMenuState.addSection("create-new-file", "Create new file", (ev: PointerEvent) => {
   createNewFile();
 
+}, "#cmenurelev");
+contextMenuState.addSection("rename", "Rename file", (ev: PointerEvent) => {
+  let f  = select.selected;
+  if (!f) {
+    return;
+  }
+  showRename(f.getAttribute('data-path'));
 }, "#cmenurelev");
 var createDB = (function () {
 
@@ -277,8 +286,12 @@ function walk(fs: typeof import('fs'), path: string, recursiveCB: (parent: strin
     fs.readdir(path, (_, files) => {
       Promise.all<void>(files.map((file, i, arr) => {
         return new Promise((resolve) => {
+          debugger;
           let fd = path + ps.sep + file;
-
+          if (file === "/") {
+            resolve();
+            return;
+          }
           fs.stat(fd, async (err, stat) => {
             await recursiveCB(path, file, stat, depth);
             if (stat.isDirectory()) {
@@ -507,18 +520,18 @@ async function ensureDB() {
 }
 async function alwaysDownload(path, writeFunc) {
   let db = await ensureDB();
-  let buffer: ArrayBuffer = await downloadToBuffer(path, (loaded, total) => {
+  let buffer: ArrayBuffer = await downloadToBuffer(DOWNLOAD_PREFIX + path, (loaded, total) => {
     let progressInPercentage: string = `${loaded * 100 / total}%\r`;
     writeFunc(progressInPercentage);
 
   });
 
-
-  let hash = await crypto.subtle.digest("SHA-256", buffer);
+  let j = await (await fetch(DOWNLOAD_PREFIX + '/hashes.json')).json()
+  // let hash = await crypto.subtle.digest("SHA-256", buffer);
   let s = db.transaction('responses', 'readwrite');
 
   let store = s.objectStore('responses');
-  await wrap(store.put({ path: path, buffer, hash: Buffer.from(hash).toString('hex') }));
+  await wrap(store.put({ path: path, buffer, hash: j[path] }));
   writeFunc("saving");
   await new Promise(resolve => s.oncomplete = resolve);
   return buffer;
@@ -588,7 +601,7 @@ async function getOrFetchResponse(path, writeFunc) {
 
     return await alwaysDownload(path, writeFunc);
   } else {
-    let p = await fetch('/hashes.json');
+    let p = await fetch(DOWNLOAD_PREFIX + '/hashes.json');
     let hashes = await p.json();
     let hash: string = hashes[path];
     transaction = db.transaction(["responses"], 'readwrite');
@@ -722,7 +735,8 @@ function XTermComponent() {
         // screen_container: document.querySelector('#screen_container'),
         filesystem: { fs, sh, Path, Buffer },
         cmdline: "root=/dev/sda console=ttyS0 rootfstype=ext4  init=/init rw  tsc=reliable mitigations=off random.trust_cpu=on",
-        autostart: true
+        autostart: true,
+        virtio_console: true
       });
       const collector = new Uint8Array(512);
       let cursor = 0;
@@ -885,7 +899,7 @@ function XTermComponent() {
       <div style={{ backgroundColor: 'white', height: "1px", padding: "2px", cursor: "row-resize" }} ref={dragBar} onMouseDown={mouseDown} onMouseUp={mouseUp}></div>
       <div style={{ backgroundColor: 'black', height: "1px", padding: "2px" }}></div>
       <div className="flex-shrink" ref={terminalRef}></div>
-      <div style={{ display: "none", backgroundColor: "rgba(50, 50,50)", opacity: "0.85", width: "70px" }} id="cmenu">
+      <div style={{ display: "none", backgroundColor: "rgba(50, 50,50)", opacity: "0.85", minWidth: "70px" }} id="cmenu">
 
       </div>
     </div>
