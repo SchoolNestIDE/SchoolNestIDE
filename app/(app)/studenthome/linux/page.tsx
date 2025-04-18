@@ -10,7 +10,7 @@ const mimeType = require('mime-types');
 
 declare global {
   const Filer: any;
-   module globalThis {
+  module globalThis {
     var openDatabase: IDBDatabase
   }
 }
@@ -19,22 +19,22 @@ const contextMenuState = {
   registrarMap: {},
   relevancyMap: new Map<Element, Element[]>(),
   built: false,
-  onClick(ev:Event) {
+  onClick(ev: Event) {
     if (!ev.target || !(ev.target instanceof HTMLElement)) return;
     let handler = this.registrarMap[ev.target.id];
     if (!handler) return;
     handler(ev);
-  
+
   },
   lazyBuild() {
     if (this.built) {
       return;
     }
     let contextMenuElement = document.querySelector('#cmenu') as HTMLElement;
-    
+
     let list = document.createElement('ul');
     for (const o in this.registrarMap) {
-      let {id, label, handler,relevancy} = this.registrarMap[o];
+      let { id, label, handler, relevancy } = this.registrarMap[o];
       const el = document.querySelector(relevancy);
       this.ensureEntry(el);
       let liElement = document.createElement('li');
@@ -46,15 +46,15 @@ const contextMenuState = {
       divElement.style.userSelect = "none";
       divElement.style.display = "none";
       this.relevancyMap.get(el)?.push(divElement);
-      divElement.onmouseenter = function (){
+      divElement.onmouseenter = function () {
         divElement.style.color = "rgb(102, 102, 102)";
       }
-      divElement.onmouseleave = function (){
+      divElement.onmouseleave = function () {
         divElement.style.color = "rgb(255, 255, 255)";
       }
-      divElement.onclick = (ev)=>{
+      divElement.onclick = (ev) => {
         contextMenuElement.style.display = "none";
-        contextMenuState.relevancyMap.get(ev.target)?.forEach((v)=>{
+        contextMenuState.relevancyMap.get(ev.target)?.forEach((v) => {
           v.style.display = "none";
         })
         handler(ev);
@@ -71,21 +71,68 @@ const contextMenuState = {
     }
   },
   addSection(id, label, handler, relevancy?: string) {
-    this.registrarMap[id] = {id, label, handler, relevancy};
+    this.registrarMap[id] = { id, label, handler, relevancy };
   }
 }
 
 function select(news) {
-  if (select.selected){
-  let selected = select.selected;
-  selected.style.backgroundColor = "";
+  if (select.selected) {
+    let selected = select.selected;
+    selected.style.backgroundColor = "";
   }
   select.selected = news;
   news.style.backgroundColor = "gray";
 }
+const newNameTemplate = "New Document";
+function createNewFile() {
+  let pat = "/"
 
-contextMenuState.addSection("create-new-file", "Create new file", (ev: PointerEvent)=>{
-  
+
+  pat = select.selected.getAttribute('data-path');
+
+  console.log(pat);
+  function foundTargetDirectory(target: string, num: number) {
+
+    let f = memoryContextSettings.fs;
+    let template = `${newNameTemplate} ${num}`;
+    let newTarget =ps.resolve(target, template);
+    f.stat(newTarget, (err, stat)=>{
+      console.log(err);
+      if (err) {
+        // Found sweet spot
+        makeTheActualFile(newTarget);
+
+      }else {
+        // Found the file create a new file
+        foundTargetDirectory(target, num + 1);
+
+      }
+    })
+  }
+  async function makeTheActualFile(target:string) {
+    memoryContextSettings.fs.writeFile(target, "", async()=>{
+      await memoryContextSettings.waitTillNextUpdate();
+      showRename(target);
+    })
+    
+  }
+  function parentTillTarget(p: string) {
+    memoryContextSettings.fs.stat(p, (err, st) => {
+      
+      let parent = ps.resolve(pat, '..');
+      if (st.isDirectory()) {
+        foundTargetDirectory(p, 1);
+      }
+      else {
+        parentTillTarget(parent);
+      }
+    })
+  }
+  parentTillTarget(pat);
+}
+contextMenuState.addSection("create-new-file", "Create new file", (ev: PointerEvent) => {
+  createNewFile();
+
 }, "#cmenurelev");
 var createDB = (function () {
 
@@ -135,8 +182,8 @@ MemoryContext.prototype.putObject =
       });
       return;
     }
-    memoryContextSettings.objStore= this.objectStore;
-    console.log("[add]", key,value);
+    memoryContextSettings.objStore = this.objectStore;
+    console.log("[add]", key, value);
     if (this.objectStore[key]) {
       memoryContextSettings.whatsChanged.push(key);
 
@@ -144,7 +191,7 @@ MemoryContext.prototype.putObject =
       memoryContextSettings.whatsNew.push(key);
     }
     this.objectStore[key] = value;
-    
+
     setTimeout(callback);
     let doesAny = false;
     if (value instanceof Uint8Array) {
@@ -168,7 +215,7 @@ MemoryContext.prototype.delete = function (key, callback) {
   const hasValuableEntry = this.objectStore[key].constructor.name === "DirectoryEntry";
   console.log("[del]", key);
 
-  
+
   if (this.readOnly) {
     setTimeout(function () {
       callback('[MemoryContext] Error: write operation on read only context');
@@ -180,7 +227,7 @@ MemoryContext.prototype.delete = function (key, callback) {
   delete this.objectStore[key];
   setTimeout(callback);
   // if (!hasValuableEntry) {
-    // return;
+  // return;
   // }
   memoryContextSettings.invalidationCB()
 };
@@ -204,18 +251,18 @@ Memory.prototype.getReadWriteContext = function () {
   return new MemoryContext(this.db, false);
 };
 const editorContext = {
-  onChange: function(value){
+  onChange: function (value) {
     // console.log(this.editor);
     if (!this.path) return;
     let m = this.path;
-    this.fs.writeFile(m, value, ()=>{})
+    this.fs.writeFile(m, value, () => { })
   },
-  load: function (){
+  load: function () {
     if (!this.path) return;
     console.log(ps.extname(this.path));
-  console.log(mimeType.lookup(ps.extname(this.path)));
+    console.log(mimeType.lookup(ps.extname(this.path)));
     monaco.editor.setModelLanguage(this.editor.getModel(), mimeType.lookup(ps.extname(this.path)));
-    fs.readFile(this.path, (err, val)=>{
+    fs.readFile(this.path, (err, val) => {
       // console.log(val);
       this.editor.getModel().setValue(new TextDecoder().decode(val));
 
@@ -225,40 +272,40 @@ const editorContext = {
   editor: null,
   fs: null
 }
-function walk(fs: typeof import('fs'), path: string, recursiveCB: (parent: string,filename:string, stat: import('fs').Stats, depth: number)=>Promise<void>, endCB: ()=>void, depth: number = 0) {
-    return new Promise<void>((resolve)=>{
-    fs.readdir(path,  (_, files)=>{
-        Promise.all<void>(files.map((file, i, arr)=>{
-            return new Promise((resolve)=>{
-                let fd = path + ps.sep + file;
-                
-                fs.stat(fd, async(err, stat)=>{
-                    await recursiveCB(path, file, stat, depth);
-                    if (stat.isDirectory()) {
-                        walk(fs, fd, recursiveCB, ()=>{}, depth + 1).then(resolve);
+function walk(fs: typeof import('fs'), path: string, recursiveCB: (parent: string, filename: string, stat: import('fs').Stats, depth: number) => Promise<void>, endCB: () => void, depth: number = 0) {
+  return new Promise<void>((resolve) => {
+    fs.readdir(path, (_, files) => {
+      Promise.all<void>(files.map((file, i, arr) => {
+        return new Promise((resolve) => {
+          let fd = path + ps.sep + file;
 
-                    } else {
-                      resolve();
-                    };
-                })
-            });
-        })).then(()=>{
-            endCB();
-            resolve();
-        })
-        
-        
+          fs.stat(fd, async (err, stat) => {
+            await recursiveCB(path, file, stat, depth);
+            if (stat.isDirectory()) {
+              walk(fs, fd, recursiveCB, () => { }, depth + 1).then(resolve);
+
+            } else {
+              resolve();
+            };
+          })
+        });
+      })).then(() => {
+        endCB();
+        resolve();
+      })
+
+
     })
-    });
+  });
 }
-function mp ( s: import('monaco-editor').editor.IEditor){
+function mp(s: import('monaco-editor').editor.IEditor) {
   s.layout();
   let db = mp.path;
   let fs = mp.fs;
   console.log(ps.extname(db));
   console.log(mimeType.lookup(ps.extname(db)));
   monaco.editor.setModelLanguage(s.getModel(), mimeType.lookup(ps.extname(db)));
-  fs.readFile(db, ()=>{
+  fs.readFile(db, () => {
     let m = s.getModel();
     m.setValue("d");
   })
@@ -267,22 +314,28 @@ var trigger;
 
 const memoryContextSettings: {
   invalidationCB: () => void,
-  ensureUnorderedList: ()=>HTMLUListElement,
+  ensureUnorderedList: () => HTMLUListElement,
   unorderedList: HTMLUListElement,
   pendingRemoval: HTMLUListElement
   currentTask: number
   whatsChanged: string[],
-  whatsNew:string[],
-  objStore: Record<string, object>  
-  feed: ()=>void // Feed memoryContextSettings like a monster
+  whatsNew: string[],
+  pathToSel: Record<string, HTMLElement>,
+  fs: typeof import('fs')
+  nextUpdateListeners: (()=>void)[],
+  waitTillNextUpdate: ()=>void
 } = {
   whatsChanged: [],
   whatsNew: [],
-
+  nextUpdateListeners: [],
   currentTask: null,
   pendingRemoval: null,
-  
-  ensureUnorderedList: function() {
+  waitTillNextUpdate(){
+    return new Promise((resolve)=>{
+      this.nextUpdateListeners.push(resolve);
+    })
+  },
+  ensureUnorderedList: function () {
     if (this.unorderedList) {
       this.pendingRemoval = this.unorderedList;
 
@@ -292,16 +345,16 @@ const memoryContextSettings: {
     return this.unorderedList;
   },
   actualUpdateCB: function () {
-    if (!this.fs) {return;}
+    if (!this.fs) { return; }
     let fd: typeof import('fs') = this.fs;
     // console.log(fd);
     let ft = this.reference;
     let ul = this.ensureUnorderedList();
     let map = new Map();
     map.set('/', ul);
-    walk(fd, '/', async(p, path, stat, depth)=>{
+    walk(fd, '/', async (p, path, stat, depth) => {
       // console.log(p);
-      fd.chown(ps.normalize(p + '/' + path), 1000, 1000, ()=>{});
+      fd.chown(ps.normalize(p + '/' + path), 1000, 1000, () => { });
       if (stat.isDirectory()) {
         if (path.startsWith('.') || path.includes("node_modules")) {
           return;
@@ -314,28 +367,28 @@ const memoryContextSettings: {
         let pm = document.createElement('p');
         pm.innerHTML = path;
         pm.hiddenf = true;
-        
-        pm.onclick = (ev)=>{
+        pm.setAttribute('data-path', ps.normalize(p + ps.sep + path))
+        pm.onclick = (ev) => {
           pm.hiddenf = !pm.hiddenf;
-          select(newUL);
+          select(pm);
 
           for (const node of newUL.children) {
             if (node === pm) continue;
             if (pm.hiddenf) {
-              node.style.display="none";
-            }else {
-              node.style.display="block";
+              node.style.display = "none";
+            } else {
+              node.style.display = "block";
 
             }
           }
         }
-        newUL.style.paddingLeft = `${20 * depth}px`
+        pm.style.paddingLeft = `${depth * 20}px`;
         newUL.appendChild(pm);
         d.appendChild(newUL);
-        map.set(p+'/'+path, newUL);
+        map.set(p + '/' + path, newUL);
         return;
       }
-      if (!map.get(p) ) return;
+      if (!map.get(p)) return;
       console.log(`Adding ${path} under  ${p}`);
       let elem = map.get(p);
       let newLI = document.createElement('li');
@@ -343,9 +396,9 @@ const memoryContextSettings: {
       newLI.setAttribute("data-path", ps.normalize(p + '/' + path));
       newLI.innerHTML = path;
       if (elem !== ul) {
-      newLI.style.display = "none";
+        newLI.style.display = "none";
       }
-      newLI.onclick = (ev)=>{
+      newLI.onclick = (ev) => {
         let ms = newLI.getAttribute('data-path');
         mp.path = ms;
         editorContext.path = ms;
@@ -354,23 +407,27 @@ const memoryContextSettings: {
 
       }
       elem.appendChild(newLI)
-    }, async()=>{
-       if (this.pendingRemoval) {
-      this.pendingRemoval.remove();
-      this.pendingRemoval = null;
-    }
-    this.reference.appendChild(this.unorderedList);
-    console.log('work')
-    this.currentTask = null;
-  })
-   
+    }, async () => {
+      if (this.pendingRemoval) {
+        this.pendingRemoval.remove();
+        this.pendingRemoval = null;
+      }
+      this.reference.appendChild(this.unorderedList);
+      console.log('work')
+      this.currentTask = null;
+      while(this.nextUpdateListeners.length !== 0){
+        let p = this.nextUpdateListeners.shift();
+        p();
+      }
+    })
+
 
   },
   invalidationCB: function () {
     if (this.currentTask) return;
     this.currentTask = setTimeout(this.actualUpdateCB.bind(this), 10);
   }
-  
+
 };
 async function downloadV86() {
   let v = await fetch("/libv86.mjs");
@@ -442,7 +499,7 @@ async function ensureDB() {
 
     }
     p.onsuccess = (ev) => {
-      self.openDatabase = p.result; 
+      self.openDatabase = p.result;
       resolve(self.openDatabase);
 
     }
@@ -455,40 +512,67 @@ async function alwaysDownload(path, writeFunc) {
     writeFunc(progressInPercentage);
 
   });
-  
+
 
   let hash = await crypto.subtle.digest("SHA-256", buffer);
   let s = db.transaction('responses', 'readwrite');
-  
+
   let store = s.objectStore('responses');
-  await wrap(store.put({path: path, buffer, hash: Buffer.from(hash).toString('hex')}));
+  await wrap(store.put({ path: path, buffer, hash: Buffer.from(hash).toString('hex') }));
   writeFunc("saving");
-  await new Promise(resolve=>s.oncomplete=resolve);
+  await new Promise(resolve => s.oncomplete = resolve);
   return buffer;
 }
+function showRename(path) {
+  let em = document.querySelector(`[data-path="${path}"]`);
+  if (!em) {
+    return;
+  }
+  let inp = document.createElement('input');
+  inp.type ="text";
+  inp.placeholder = ps.basename(path);
+  inp.onkeydown = (ev)=>{
+    let shouldStop = ev.key === "Enter" && !ev.shiftKey;
+    if (shouldStop) {
+      ev.preventDefault();
+      // console.log(em);
+      em.textContent = inp.value;
+      inp.replaceWith(em);  
+      inp.remove();
+      memoryContextSettings.fs.rename(path, ps.resolve(ps.dirname(path), inp.value));
+    }else {
+      
+    }
+  }
+  em.replaceWith(inp);
+  inp.focus();
+}
+globalThis['showRename'] = showRename;
 function showContextMenu(ev: MouseEvent) {
   contextMenuState.target = ev.target;
   console.log(ev.target);
   let elem = document.querySelector('#cmenu') as HTMLElement;
-  document.addEventListener('click', function a(ev){
-      elem.style.display = "none";
-      contextMenuState.relevancyMap.get(ev.target)?.forEach((v)=>{
-        v.style.display = "none";
-      })
-      document.removeEventListener('click',a);
-    
+  document.addEventListener('click', function a(ev) {
+    elem.style.display = "none";
+    contextMenuState.relevancyMap.get(ev.target)?.forEach((v) => {
+      v.style.display = "none";
+    })
+    document.removeEventListener('click', a);
+
   })
   if (!elem) return;
 
   contextMenuState.lazyBuild();
   console.log(contextMenuState.relevancyMap);
-  contextMenuState.relevancyMap.get(ev.target)?.forEach((v)=>{
+  for (const partOfPath of ev.composedPath()){
+  contextMenuState.relevancyMap.get(partOfPath)?.forEach((v) => {
     v.style.display = "block";
   })
+  }
   elem.style.position = "absolute";
   elem.style.display = "block";
-  elem.style.top = `${ev.clientY}px`;
-  elem.style.left = `${ev.clientX}px`;
+  elem.style.top = `${ev.clientY - 2}px`;
+  elem.style.left = `${ev.clientX + 2}px`;
 }
 async function getOrFetchResponse(path, writeFunc) {
   let db = await ensureDB();
@@ -496,35 +580,35 @@ async function getOrFetchResponse(path, writeFunc) {
   let objectStore = transaction.objectStore('responses');
   let count = await wrap(objectStore.count(path));
   if (writeFunc === null) {
-  writeFunc = ()=>{}
+    writeFunc = () => { }
   }
-if (count === 0) {
-  // Cache-miss
-  writeFunc("Cache miss");
-  
-  return await alwaysDownload(path, writeFunc);
-} else {
-  let p = await fetch('/hashes.json');
-  let hashes = await p.json();
-  let hash: string = hashes[path];
-   transaction = db.transaction(["responses"], 'readwrite');
-   objectStore = transaction.objectStore('responses');
-   writeFunc("found in cache\n");
-  let md = await wrap(objectStore.get(path));
-  console.log(hash);
-  console.log(md.hash);
+  if (count === 0) {
+    // Cache-miss
+    writeFunc("Cache miss");
 
-  if (hash !== md.hash) {
+    return await alwaysDownload(path, writeFunc);
+  } else {
+    let p = await fetch('/hashes.json');
+    let hashes = await p.json();
+    let hash: string = hashes[path];
     transaction = db.transaction(["responses"], 'readwrite');
     objectStore = transaction.objectStore('responses');
-    await wrap(objectStore.delete(path));
-    await alwaysDownload(path,writeFunc);
+    writeFunc("found in cache\n");
+    let md = await wrap(objectStore.get(path));
+    console.log(hash);
+    console.log(md.hash);
+
+    if (hash !== md.hash) {
+      transaction = db.transaction(["responses"], 'readwrite');
+      objectStore = transaction.objectStore('responses');
+      await wrap(objectStore.delete(path));
+      await alwaysDownload(path, writeFunc);
+
+    }
+    return md.buffer;
 
   }
-  return md.buffer;
 
-}
-  
 }
 function XTermComponent() {
   const terminalRef = useRef(null);
@@ -532,7 +616,7 @@ function XTermComponent() {
   let temr, fadd;
   const reference = useRef(null);
   const m = useRef(null);
- 
+
   useEffect(() => {
     if (k == 1) {
       return;
@@ -550,12 +634,12 @@ function XTermComponent() {
       fadd = new fitAddon.FitAddon();
       let fd = new Memory("fd-2");
 
-      fs= new Filer.FileSystem({
+      fs = new Filer.FileSystem({
         name: "anura-mainContext",
         provider: fd
       });
       editorContext.fs = fs;
-      document.addEventListener('contextmenu', (ev)=>{
+      document.addEventListener('contextmenu', (ev) => {
         ev.preventDefault();
         showContextMenu(ev);
 
@@ -569,7 +653,7 @@ function XTermComponent() {
       temr.loadAddon(fadd);
       fadd.fit();
       const V86 = await downloadV86();
-      
+
       var Path = Filer.Path;
       var Buffer = Filer.Buffer;
       var sh = new fs.Shell();
@@ -602,13 +686,13 @@ function XTermComponent() {
       }
       // downloader('/disk');
       // return;
-      let buffer: ArrayBuffer = await getOrFetchResponse('/disk', (d)=>{
+      let buffer: ArrayBuffer = await getOrFetchResponse('/disk', (d) => {
         // temr.write(d);
       });
       // let doc = open('');
-     
+
       // doc?.docum ent.close();
-      
+
       window.fs = fs;
       window.sh = sh
       window.path = Path;
@@ -639,7 +723,7 @@ function XTermComponent() {
         filesystem: { fs, sh, Path, Buffer },
         cmdline: "root=/dev/sda console=ttyS0 rootfstype=ext4  init=/init rw  tsc=reliable mitigations=off random.trust_cpu=on",
         autostart: true
-            });
+      });
       const collector = new Uint8Array(512);
       let cursor = 0;
       let dmaBufferAddress = 0;
@@ -659,7 +743,7 @@ function XTermComponent() {
 
       // let pd = new WebAssembly.Memory({"initial": 500});
       // let pd = new WebAssembly.Memory({"initial": 500});
-      
+
       emulator.add_listener("serial0-output-byte", (byte: number) => {
         collector[cursor] = byte;
         cursor++;
@@ -685,12 +769,12 @@ function XTermComponent() {
       })
     })();
     k = 1;
-  }, [terminalRef, dragBar,reference]);
+  }, [terminalRef, dragBar, reference]);
 
   function handleEditorDidMount(editor) {
     m.current = editor;
     editorContext.editor = editor;
-    
+
   }
   function onChange(edi) {
     editorContext.onChange(edi);
@@ -793,19 +877,19 @@ function XTermComponent() {
     <div className="flex flex-col h-screen max-h-screen  w-screen">
       <div className="relative flex flex-row flex-grow flex-1 " ref={newref}>
         <SideFileBar refd={reference} />
-        <div className="flex-shrink " style={{maxWidth: "20px",width:"20px", backgroundColor: "gray", cursor: "column-resize"}} onMouseDown={mouseDownSize} onMouseUp={mouseUpSide}></div>
+        <div className="flex-shrink " style={{ maxWidth: "20px", width: "20px", backgroundColor: "gray", cursor: "column-resize" }} onMouseDown={mouseDownSize} onMouseUp={mouseUpSide}></div>
         <div className={`relative flex-grow`} ref={r}>
           {editor}
         </div>
       </div>
       <div style={{ backgroundColor: 'white', height: "1px", padding: "2px", cursor: "row-resize" }} ref={dragBar} onMouseDown={mouseDown} onMouseUp={mouseUp}></div>
       <div style={{ backgroundColor: 'black', height: "1px", padding: "2px" }}></div>
-      <div class="flex-shrink" ref={terminalRef}></div>
-      <div style={{display: "none", backgroundColor: "rgba(50, 50,50)", opacity: "0.85", width:"70px"}} id="cmenu">
-        
+      <div className="flex-shrink" ref={terminalRef}></div>
+      <div style={{ display: "none", backgroundColor: "rgba(50, 50,50)", opacity: "0.85", width: "70px" }} id="cmenu">
+
       </div>
     </div>
-    
+
   );
 }
 function SideFileBar(f) {
