@@ -1,4 +1,13 @@
 #!/bin/bash
+packed_hosts() {
+cat <<EOF
+# Standard host addresses
+127.0.0.1  localhost
+::1        localhost ip6-localhost ip6-loopback
+ff02::1    ip6-allnodes
+ff02::2    ip6-allrouters
+EOF
+}
 mount -t tmpfs /run /run
 mount -t tmpfs /var /var
 mount -t devtmpfs /dev /dev
@@ -7,6 +16,8 @@ mount -o remount,rw /
 mkdir /workspaces
 mount -t 9p -o exec host9p /workspaces
 mount -t tmpfs /home/nest /home/nest
+ip link set lo up
+packed_hosts >> /etc/hosts
 if ip link | grep -q "eth0"
 then
 	ip link set eth0 up
