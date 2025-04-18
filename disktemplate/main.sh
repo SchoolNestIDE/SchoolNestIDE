@@ -1,6 +1,6 @@
 #!/bin/bash
 docker build -t nestdocker .
-docker run -d -it --name nestdocker nestd   ocker
+docker run -d -it --name nestdocker nestdocker
 docker export nestdocker > output.tar
 truncate -s 1G ../public/disk
 truncate -s +200M ../public/disk
