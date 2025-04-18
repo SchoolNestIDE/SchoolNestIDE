@@ -43,3 +43,4 @@ public/disk*
 public/disk.*
 hashes.json
 .vscode
+disktemplate/output.tar
