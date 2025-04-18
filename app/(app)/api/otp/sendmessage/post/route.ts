@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from '@/app/(app)/lib/auth';
 import clientPromise from '@/app/lib/mongodb';
 import nodemailer from "nodemailer";
-import { emailTemplate } from '@/app/lib/emailTemplate';
+// import { emailTemplate } from '@/app/lib/emailTemplate';
 
 
 interface Data {
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest, res: NextResponse<Data>) {
         to: email,
         subject: subject,
         text: messageContent,
-        html: emailTemplate({ subject, content: messageContent }),
+        html:  messageContent,
     };
 
     await transporter.sendMail(mailOptions);

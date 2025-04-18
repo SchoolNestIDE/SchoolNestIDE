@@ -36,3 +36,10 @@ yarn-error.log*
 next-env.d.ts
 
 .env
+certificates
+public/initramfs-virt
+public/vmlinuz-virt
+public/disk*
+public/disk.*
+hashes.json
+.vscode

@@ -724,7 +724,7 @@ public class CustomFileInputStream extends InputStream {
               files.find((f) => f.filename === activeFile)?.contents ?? ""
             }
             onChange={handleEditorChange}
-            options={{ automaticLayout: true }}
+            options={{ automaticLayout: true }} 
             onMount={handleEditorDidMount}
           />
         </div>

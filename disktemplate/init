@@ -1,0 +1,22 @@
+#!/bin/bash
+mount -t tmpfs /run /run
+mount -t tmpfs /var /var
+mount -t devtmpfs /dev /dev
+mount -t proc /proc /proc
+mount -o remount,rw /
+mkdir /workspaces
+mount -t 9p -o exec host9p /workspaces
+mount -t tmpfs /home/nest /home/nest
+if ip link | grep -q "eth0"
+then
+	ip link set eth0 up
+	udhcpc
+fi
+echo "nest ALL=(ALL:ALL) ALL" >> /etc/sudoers
+#sleep 10
+#clear
+echo "Project is located at ~"
+cd /home/nest
+hostname nest
+#/bin/nest_client &
+exec sudo -u nest /bin/bash
