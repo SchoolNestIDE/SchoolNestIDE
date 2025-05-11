@@ -10,4 +10,4 @@ prepare:
 	protoc $(SRCS_PROTO) --cpp_out=gen --js_out=import_style=commonjs,binary:gen 
 
 compile: prepare
-	g++ -static $(INCLUDE_DIRS) $(SRCS_C) $(SRCS_PROTO_C) -lprotobuf  -o md
+	i686-linux-gnu-g++ -static $(INCLUDE_DIRS) $(SRCS_C) $(SRCS_PROTO_C) -lprotobuf  -o md
