@@ -339,7 +339,6 @@ int main(int argc, char const *argv[])
             dp->msgLen = len;
             tx->msgId = 0;
             memcpy(tx->message, dp, sizeof(DataPkt) + 1500);
-            printf("Connection id %d\r\n", dp->connId);
 
             ipc_buffer_tx[0] = 1; // let client process
             while (ipc_buffer_tx[0] == 1); // Wait for process
