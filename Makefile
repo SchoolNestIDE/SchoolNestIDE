@@ -11,3 +11,6 @@ prepare:
 
 compile: prepare
 	i686-linux-gnu-g++ -static $(INCLUDE_DIRS) $(SRCS_C) $(SRCS_PROTO_C) -lprotobuf  -o md
+docker:
+	docker build -t nest_client .
+	docker run --privileged --rm -v $(shell pwd):/app nest_client make -C /app -f Makefile compile

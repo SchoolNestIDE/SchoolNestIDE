@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <cstdio>
 #include <libgen.h>
 #include <stdint.h>
@@ -15,7 +16,7 @@
 #include <errno.h>
 #include <string>
 #include <nest_client/nest_client.pb.h>
-
+#include <algorithm>
 #include <sys/mman.h>
 typedef struct {
     uint64_t pfn : 55;
@@ -180,14 +181,7 @@ void handle_protocol(Protocol& pr, ProtocolResponse* response) {
 int inotify_poll_loop() {
 
 }
-int send_message(char* msg, size_t len) {
-  size_t offset;
-  while (len != 0 || offset >= len) {
-    size_t to_write = std::min(len, 65536UL);
-    
-  }
-  return offset;
-}
+
 const size_t kChunkSize = 1500;
 int main(int argc, char const *argv[])
 { 
@@ -253,7 +247,7 @@ int main(int argc, char const *argv[])
             size_t off = 0;
 
             while (l >= 0) {
-              size_t to_write = std::min(l, kChunkSize);
+              size_t to_write = std::min(l, (size_t)kChunkSize);
               memcpy(response->message, data.c_str() + off, data.size());
               l -= to_write;
               off += to_write;
