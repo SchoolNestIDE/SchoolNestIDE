@@ -6,6 +6,7 @@
 .pnp.js
 .yarn/install-state.gz
 
+__pycache__
 # testing
 /coverage
 
@@ -44,3 +45,7 @@ public/disk.*
 hashes.json
 .vscode
 disktemplate/output.tar
+*.pb.*
+gen
+compile_commands.json
+package-lock.json

@@ -9,6 +9,7 @@ function walk(path, recursiveCB, endCB) {
                 return new Promise((resolve) => {
                     let fd = p.normalize(path + p.sep + file);
                     fs.stat(fd, (err, stat) => {
+                        console.log(err);
                         if (stat.isDirectory()) {
                             walk(fd, recursiveCB, () => { }).then(resolve);
                         }

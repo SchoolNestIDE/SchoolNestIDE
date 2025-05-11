@@ -8,13 +8,20 @@ import * as ps from 'path';
 import { urlToHttpOptions } from 'url';
 
 const mimeType = require('mime-types');
+globalThis['proto'] = require('../../../../gen/nest_client/nest_client_pb.js');
+
+
+
 const DOWNLOAD_PREFIX = ""
 declare global {
   const Filer: any;
   module globalThis {
     var openDatabase: IDBDatabase
   }
-}
+  const proto: typeof import('../../../../gen/nest_client/nest_client_pb.js')
+};
+// let od = new proto.OpenDirRequest();
+
 
 const contextMenuState = {
   registrarMap: {},
@@ -89,38 +96,38 @@ const newNameTemplate = "New Document";
 function createNewFile() {
   let pat = "/"
 
-  if (select.selected){
-  pat = select.selected.getAttribute('data-path');
+  if (select.selected) {
+    pat = select.selected.getAttribute('data-path');
   }
-  console.log(pat);
+  // console.log(pat);
   function foundTargetDirectory(target: string, num: number) {
 
     let f = memoryContextSettings.fs;
     let template = `${newNameTemplate} ${num}`;
-    let newTarget =ps.resolve(target, template);
-    f.stat(newTarget, (err, stat)=>{
-      console.log(err);
+    let newTarget = ps.resolve(target, template);
+    f.stat(newTarget, (err, stat) => {
+      // console.log(err);
       if (err) {
         // Found sweet spot
         makeTheActualFile(newTarget);
 
-      }else {
+      } else {
         // Found the file create a new file
         foundTargetDirectory(target, num + 1);
 
       }
     })
   }
-  async function makeTheActualFile(target:string) {
-    memoryContextSettings.fs.writeFile(target, "", async()=>{
+  async function makeTheActualFile(target: string) {
+    memoryContextSettings.fs.writeFile(target, "", async () => {
       await memoryContextSettings.waitTillNextUpdate();
-      showRename(target);
+      showRename(target, true);
     })
-    
+
   }
   function parentTillTarget(p: string) {
     memoryContextSettings.fs.stat(p, (err, st) => {
-      
+
       let parent = ps.resolve(pat, '..');
       if (st.isDirectory()) {
         foundTargetDirectory(p, 1);
@@ -137,7 +144,7 @@ contextMenuState.addSection("create-new-file", "Create new file", (ev: PointerEv
 
 }, "#cmenurelev");
 contextMenuState.addSection("rename", "Rename file", (ev: PointerEvent) => {
-  let f  = select.selected;
+  let f = select.selected;
   if (!f) {
     return;
   }
@@ -192,7 +199,7 @@ MemoryContext.prototype.putObject =
       return;
     }
     memoryContextSettings.objStore = this.objectStore;
-    console.log("[add]", key, value);
+    // console.log("[add]", key, value);
     if (this.objectStore[key]) {
       memoryContextSettings.whatsChanged.push(key);
 
@@ -222,7 +229,7 @@ MemoryContext.prototype.putObject =
 
 MemoryContext.prototype.delete = function (key, callback) {
   const hasValuableEntry = this.objectStore[key].constructor.name === "DirectoryEntry";
-  console.log("[del]", key);
+  // console.log("[del]", key);
 
 
   if (this.readOnly) {
@@ -259,6 +266,49 @@ Memory.prototype.getReadOnlyContext = function () {
 Memory.prototype.getReadWriteContext = function () {
   return new MemoryContext(this.db, false);
 };
+// typedef struct {
+//   uint32_t msgType;
+//   int msgId;
+//   char message[];
+// } Protocol;
+// typedef struct {
+//   uint32_t msgType;
+//   int msgId;
+//   char message[];
+// } Protocol;
+// typedef struct {
+//   int port;
+// } ConnectRequest;
+// typedef struct {
+//   int connId;
+//   size_t msgLen;
+//   char data[];
+// } DataPkt;
+// typedef struct {
+//   int id;
+// } Disconnect;
+// typedef struct {
+//   int id;
+// } ConnectResponse;
+// typedef struct {
+//   int connectionid; 
+//   int fd;
+// } ActiveConnection;
+const ConnectionContext = {
+  msgId: 0
+}
+function createConnectPacket(msgId, port) {
+  let dv = new DataView(new ArrayBuffer(4 + 4 + 4));
+  let id = ConnectionContext.msgId;
+  ConnectionContext.msgId += 1;
+  dv.setInt32(0, 0, true);
+  dv.setInt32(4, id, true);
+  let ConnectionPkt = new DataView(dv.buffer, 8);
+
+  ConnectionPkt.setUint32(0, port, true);
+  return [id, dv];
+}
+
 const editorContext = {
   onChange: function (value) {
     // console.log(this.editor);
@@ -268,8 +318,8 @@ const editorContext = {
   },
   load: function () {
     if (!this.path) return;
-    console.log(ps.extname(this.path));
-    console.log(mimeType.lookup(ps.extname(this.path)));
+    // console.log(ps.extname(this.path));
+    // console.log(mimeType.lookup(ps.extname(this.path)));
     monaco.editor.setModelLanguage(this.editor.getModel(), mimeType.lookup(ps.extname(this.path)));
     fs.readFile(this.path, (err, val) => {
       // console.log(val);
@@ -286,7 +336,6 @@ function walk(fs: typeof import('fs'), path: string, recursiveCB: (parent: strin
     fs.readdir(path, (_, files) => {
       Promise.all<void>(files.map((file, i, arr) => {
         return new Promise((resolve) => {
-          debugger;
           let fd = path + ps.sep + file;
           if (file === "/") {
             resolve();
@@ -315,8 +364,8 @@ function mp(s: import('monaco-editor').editor.IEditor) {
   s.layout();
   let db = mp.path;
   let fs = mp.fs;
-  console.log(ps.extname(db));
-  console.log(mimeType.lookup(ps.extname(db)));
+  // console.log(ps.extname(db));
+  // console.log(mimeType.lookup(ps.extname(db)));
   monaco.editor.setModelLanguage(s.getModel(), mimeType.lookup(ps.extname(db)));
   fs.readFile(db, () => {
     let m = s.getModel();
@@ -335,16 +384,16 @@ const memoryContextSettings: {
   whatsNew: string[],
   pathToSel: Record<string, HTMLElement>,
   fs: typeof import('fs')
-  nextUpdateListeners: (()=>void)[],
-  waitTillNextUpdate: ()=>void
+  nextUpdateListeners: (() => void)[],
+  waitTillNextUpdate: () => Promise<void>
 } = {
   whatsChanged: [],
   whatsNew: [],
   nextUpdateListeners: [],
   currentTask: null,
   pendingRemoval: null,
-  waitTillNextUpdate(){
-    return new Promise((resolve)=>{
+  waitTillNextUpdate() {
+    return new Promise((resolve) => {
       this.nextUpdateListeners.push(resolve);
     })
   },
@@ -426,9 +475,9 @@ const memoryContextSettings: {
         this.pendingRemoval = null;
       }
       this.reference.appendChild(this.unorderedList);
-      console.log('work')
+      // console.log('work')
       this.currentTask = null;
-      while(this.nextUpdateListeners.length !== 0){
+      while (this.nextUpdateListeners.length !== 0) {
         let p = this.nextUpdateListeners.shift();
         p();
       }
@@ -455,12 +504,193 @@ const MSGS = {
   CLOSE_FILE: 1,
 
 }
+let viewable_url = "http://localhost:8080/bootstrap.html";
+
 let rx_addr = 0;
+function open_webviewer() {
+  let w = open(viewable_url, "web_ipc");
+  setTimeout(() => {
+    let mc = new MessageChannel();
+    let p1 = mc.port1;
+
+    p1.onmessage = (ev) => {
+      // console.log(ev.data['id']);
+      let buffers = []
+      let totalLen = 0;
+      function lf(e) {
+
+        // console.log(new TextDecoder().decode(ev));
+        console.log(e);
+        // console.log(this.id);
+        buffers.push(e.slice());
+        // console.log(e.length);
+        totalLen += e.length;
+
+        // p1.postMessage({ id: this.id, real: e.slice() }, []);
+        // conn?.disconnect();
+      }
+      lf.id = ev.data['id'];
+      let conn = send_connect_packet(6061, lf, function (f) {
+        // console.log(this.id);
+        conn.send(ev.data.str + "\nexit 0\n");
+
+      });
+      conn.ondisconnect = function () {
+        // console.log(totalLen);
+        let ua = new Uint8Array(totalLen);
+        let offset = 0;
+        for (let buf of buffers) {
+          ua.set(buf, offset);
+          offset += buf.length;
+        }
+        p1.postMessage({ id: this.id, real: ua.slice() }, []);
+      }
+      conn.id = ev.data['id']
+
+
+
+    };
+    p1.start();
+    w?.postMessage(mc.port2, '*', [mc.port2]);
+  }, 200);
+
+}
+globalThis['open_webviewer'] = open_webviewer;
 function msg_loop(emulator: any) {
+  msg_loop.emulator = emulator;
+  msg_loop.handlers = msg_loop.handlers ?? [];
+  msg_loop.ids = msg_loop.ids ?? [];
+  msg_loop.buffers = msg_loop.buffers ?? [];
+  msg_loop.totalSize = 0;
+
   if (emulator.read_memory(rx_addr, 1)[0] == 1) {
 
+    let buf = emulator.read_memory(rx_addr + 1, 65536) as Uint8Array
+
+    let dv = new DataView(buf.buffer, buf.byteOffset, 65536);
+    // console.log(dv.getUint32(0, true));
+
+    if (dv.getUint32(0, true) === 2 || dv.getUint32(0, true) === 1) /* DATA or DISCONNECT*/ {
+      if (dv.getUint32(0, true) === 1) {
+        msg_loop.handlers[dv.getUint32(8, true)]("disconnect");
+      }
+      let kOffset = 16;
+      let realdat = dv.byteOffset + kOffset;
+      let datLen = dv.getUint32(12, true);
+      console.log(dv.getUint32(8, true));
+      if (msg_loop.handlers[dv.getUint32(8, true)]) {
+        msg_loop.handlers[dv.getUint32(8, true)](new Uint8Array(dv.buffer, realdat, datLen));
+      }
+      // console.log(dv.getUint32(8, true), dv.getUint32(12, true), dv.getUint8(16, true));
+    } else {
+      let msgId = dv.getUint32(4, true);
+      // console.log(msgId);
+      if (msg_loop.ids[msgId]) {
+        msg_loop.ids[msgId](new Uint8Array(dv.buffer, dv.byteOffset + 8, 65536 - 8));
+        //delete msg_loop.ids[msgId];
+      }
+    }
+    emulator.write_memory([0], rx_addr);
   }
 }
+// typedef struct {
+//   int connId;
+//   size_t msgLen;
+//   char data[];
+// } DataPkt;
+function create_data_pkt(connid, buffer) {
+  let dv = new DataView(new ArrayBuffer(4 + 4 + 4 + 4 + buffer.length));
+  let id = ConnectionContext.msgId;
+  ConnectionContext.msgId += 1;
+  dv.setInt32(0, 2, true);
+  dv.setInt32(4, id, true);
+  let DataPkt = new DataView(dv.buffer, 8);
+
+  DataPkt.setUint32(0, connid, true);
+  DataPkt.setUint32(4, buffer.length, true);
+  new Uint8Array(dv.buffer).set(buffer, 8 + 8);
+
+  return [id, dv];
+}
+// typedef struct {
+//     int id;
+// } Disconnect;
+function create_disconnect_pkt(connid) {
+
+  let dv = new DataView(new ArrayBuffer(4 + 4 + 4));
+  let id = ConnectionContext.msgId;
+  ConnectionContext.msgId += 1;
+  dv.setInt32(0, 1, true); // Disocnnect msg type
+  dv.setInt32(4, id, true);
+  let DiconnectPacket = new DataView(dv.buffer, 8);
+
+  DiconnectPacket.setUint32(0, connid, true);
+  // DiconnectPacket.setUint32(4, buffer.length, true);
+  return [id, dv];
+}
+function send_disconnect_packet(connid) {
+  let c = create_disconnect_pkt(connid);
+  msg_loop.emulator.write_memory(new Uint8Array(c[1].buffer), dmaBufferAddress + 1);
+  msg_loop.emulator.write_memory([1], dmaBufferAddress);
+  return;
+}
+function send_data_pkt(connid, buffer) {
+  let c = create_data_pkt(connid, buffer);
+  msg_loop.emulator.write_memory(new Uint8Array(c[1].buffer), dmaBufferAddress + 1);
+  msg_loop.emulator.write_memory([1], dmaBufferAddress);
+  return;
+}
+
+globalThis['send_data_pkt'] = send_data_pkt;
+function send_connect_packet(port, handler, connectionId = (num) => { }) {
+  let c = createConnectPacket(0, port);
+  if (!msg_loop.emulator) {
+    return;
+  }
+  let result = {
+    connId: -1,
+    disconnect() {
+      send_disconnect_packet(this.connId);
+    },
+    ondisconnect() {
+      console.error("IP Disconnected");
+    },
+    send(buf) {
+      if (typeof buf === "string") {
+        send_data_pkt(this.connId, new TextEncoder().encode(buf));
+
+      } else if (buf instanceof Uint8Array) {
+
+        send_data_pkt(this.connId, buf);
+
+      }
+    },
+    handle: handler
+  }
+  msg_loop.ids[c[0]] = (buf) => {
+    if (buf === "disconnect") {
+      result.ondisconnect();
+    }
+    let connId = new Uint32Array(buf)[0];
+    let error = new Uint32Array(buf)[1];
+    result.connId = connId;
+    connectionId.apply(result, [connId]);
+    msg_loop.handlers[connId] = (d) => {
+      if (d === "disconnect") {
+        return result.ondisconnect();
+      }
+      return result.handle(d);
+    };
+  }
+
+  msg_loop.emulator.write_memory(new Uint8Array(c[1].buffer), dmaBufferAddress + 1);
+  msg_loop.emulator.write_memory([1], dmaBufferAddress);
+  return result;
+}
+globalThis['send_conn'] = send_connect_packet;
+contextMenuState.addSection("open-web-preview", "Open web preview", () => {
+  open_webviewer();
+}, "body");
 async function downloadToBuffer(param, writeFunc: (loaded: number, total: number) => void) {
   let resp = await fetch(param + ".gz");
   let uncompressedLength = parseInt((await fetch('/disk')).headers.get('content-length'))
@@ -536,25 +766,32 @@ async function alwaysDownload(path, writeFunc) {
   await new Promise(resolve => s.oncomplete = resolve);
   return buffer;
 }
-function showRename(path) {
+function showRename(path, switchTo = false) {
   let em = document.querySelector(`[data-path="${path}"]`);
   if (!em) {
     return;
   }
   let inp = document.createElement('input');
-  inp.type ="text";
+  inp.type = "text";
   inp.placeholder = ps.basename(path);
-  inp.onkeydown = (ev)=>{
+  inp.onkeydown = async (ev) => {
     let shouldStop = ev.key === "Enter" && !ev.shiftKey;
     if (shouldStop) {
       ev.preventDefault();
       // console.log(em);
       em.textContent = inp.value;
-      inp.replaceWith(em);  
+      inp.replaceWith(em);
       inp.remove();
-      memoryContextSettings.fs.rename(path, ps.resolve(ps.dirname(path), inp.value));
-    }else {
-      
+      memoryContextSettings.fs.rename(path, ps.resolve(ps.dirname(path), inp.value), async () => {
+        await memoryContextSettings.waitTillNextUpdate();
+        select(document.querySelector(`[data-path="${ps.resolve(ps.dirname(path), inp.value)}"]`));
+
+        editorContext.path = ps.resolve(ps.dirname(path), inp.value);
+        editorContext.load();
+      });
+
+    } else {
+
     }
   }
   em.replaceWith(inp);
@@ -563,24 +800,26 @@ function showRename(path) {
 globalThis['showRename'] = showRename;
 function showContextMenu(ev: MouseEvent) {
   contextMenuState.target = ev.target;
-  console.log(ev.target);
+  // console.log(ev.target);
   let elem = document.querySelector('#cmenu') as HTMLElement;
   document.addEventListener('click', function a(ev) {
     elem.style.display = "none";
-    contextMenuState.relevancyMap.get(ev.target)?.forEach((v) => {
-      v.style.display = "none";
-    })
+    for (const partOfPath of ev.composedPath()) {
+      contextMenuState.relevancyMap.get(partOfPath)?.forEach((v) => {
+        v.style.display = "block";
+      })
+    }
     document.removeEventListener('click', a);
 
   })
   if (!elem) return;
 
   contextMenuState.lazyBuild();
-  console.log(contextMenuState.relevancyMap);
-  for (const partOfPath of ev.composedPath()){
-  contextMenuState.relevancyMap.get(partOfPath)?.forEach((v) => {
-    v.style.display = "block";
-  })
+  // console.log(contextMenuState.relevancyMap);
+  for (const partOfPath of ev.composedPath()) {
+    contextMenuState.relevancyMap.get(partOfPath)?.forEach((v) => {
+      v.style.display = "block";
+    })
   }
   elem.style.position = "absolute";
   elem.style.display = "block";
@@ -608,14 +847,14 @@ async function getOrFetchResponse(path, writeFunc) {
     objectStore = transaction.objectStore('responses');
     writeFunc("found in cache\n");
     let md = await wrap(objectStore.get(path));
-    console.log(hash);
-    console.log(md.hash);
+    // console.log(hash);
+    // console.log(md.hash);
 
     if (hash !== md.hash) {
       transaction = db.transaction(["responses"], 'readwrite');
       objectStore = transaction.objectStore('responses');
       await wrap(objectStore.delete(path));
-      await alwaysDownload(path, writeFunc);
+      return await alwaysDownload(path, writeFunc);
 
     }
     return md.buffer;
@@ -623,6 +862,9 @@ async function getOrFetchResponse(path, writeFunc) {
   }
 
 }
+let dmaBufferAddress = 0;
+
+globalThis['creates'] = createConnectPacket;
 function XTermComponent() {
   const terminalRef = useRef(null);
   const dragBar = useRef(null);
@@ -687,7 +929,7 @@ function XTermComponent() {
         let tasks = [{ start: 0 }, { start: blocksize }, { start: blocksize * 2 }, { start: blocksize * 3 }];
         for (var i = 0; i < 4; i++) {
           function fc(isdf) {
-            console.log('fetching pice')
+            // console.log('fetching pice')
             tasks[isdf].task = fetch(url, { headers: { "Range": `bytes=${tasks[isdf].start}-${tasks[isdf].start + 511}` } });
             tasks[isdf].start += 4096 * 4;
             tasks[isdf].task.finally(fc.bind(null, isdf));
@@ -702,6 +944,16 @@ function XTermComponent() {
       let buffer: ArrayBuffer = await getOrFetchResponse('/disk', (d) => {
         // temr.write(d);
       });
+      // debugger;
+      let userContainer = new WebAssembly.Memory({ initial: 65536 / 8 });
+      let ab = new Uint8Array(userContainer.buffer);
+      ab.cursor = 0;
+
+
+      // let dc = new DecompressionStream("gzip");
+      // dc.readable.pipeTo(stream);
+      // response.body.pipeTo(dc.writable);
+
       // let doc = open('');
 
       // doc?.docum ent.close();
@@ -710,11 +962,94 @@ function XTermComponent() {
       window.sh = sh
       window.path = Path;
       window.Buffer = Buffer;
+      let oldSlice = ArrayBuffer.prototype.slice;
+      ArrayBuffer.prototype.slice = function (...args) {
+        console.log("ArrayBuffer.prototype.slice")
+        oldSlice.apply(this, args);
+      }
+      let oldConstructor = Uint8Array;
+      let holeyArray = new Map();
+      class ArrayBufferExt extends ArrayBuffer {
+        get byteLength() {
+          return 12 * 1024 * 1024 * 1024; // 12GB but not actually
+        }
+        static wrap(buf) {
+
+        }
+      }
+      self['holeyArray'] = holeyArray;
+      const BLOCK_SIZE=512;
+      function get_from_cache(len, offset) {
+        var number_of_blocks = len / BLOCK_SIZE;
+        var block_index = offset / BLOCK_SIZE;
+
+        for (var i = 0; i < number_of_blocks; i++) {
+          var block = holeyArray.get(block_index + i);
+
+          if (!block) {
+            return;
+          }
+        }
+
+        if (number_of_blocks === 1) {
+          return holeyArray.get(block_index);
+        }
+        else {
+          var result = new Uint8Array(len);
+          for (var i = 0; i < number_of_blocks; i++) {
+            result.set(holeyArray.get(block_index + i), i * BLOCK_SIZE);
+          }
+          return result;
+        }
+      }
+      function fds(offset, len, block) {
+        // Used by AsyncXHRBuffer, AsyncXHRPartfileBuffer and AsyncFileBuffer
+        // Overwrites blocks from the original source that have been written since
+
+        var start_block = offset / BLOCK_SIZE;
+        var block_count = len / BLOCK_SIZE;
+
+        for (var i = 0; i < block_count; i++) {
+          const cached_block = holeyArray.get(start_block + i);
+
+          if (cached_block) {
+            block.set(cached_block, i * BLOCK_SIZE);
+          }
+          else if (true) {
+            holeyArray.set(start_block + i, block.slice(i * BLOCK_SIZE, (i + 1) * BLOCK_SIZE));
+          }
+        }
+      };
+      Uint8Array = function (...args) {
+        if (args.filter(v => v instanceof ArrayBufferExt).length > 0) {
+          while (true) {
+            args[0] = buffer;
+            let offset = args[1];
+            let length = args[2];
+            // console.log(length);
+
+            if (offset <= buffer.byteLength && offset + length <= buffer.byteLength) {
+              break;
+            }
+            console.log("oob access resoultion")
+            let v = get_from_cache(length, offset);
+            if (!v) {
+              fds(offset, length, new oldConstructor(length));
+            }
+            return get_from_cache(length, offset);
+          }
+        }
+        return new oldConstructor(...args);
+      }
+
       const emulator = new V86.V86({
         memory_size: 2 * 1024 * 1024 * 1024,
         vga_memory_size: 8 * 1024 * 1024,
         wasm_path: "/v86.wasm",
-
+        net_device: {
+          "type": "virtio",
+          "relay_url": "wisp://localhost:6001/"
+        },
         bios: {
           url: "/seabios.bin",
         },
@@ -725,35 +1060,33 @@ function XTermComponent() {
           url: "/vmlinuz-virt",
           async: true,
         },
-        net_device: {
-          relay_url: "wisp://localhost:6001/",
-          type: "virtio"
-        },
         hda: {
-          buffer: buffer
+          buffer: new ArrayBufferExt()
         },
         // screen_container: document.querySelector('#screen_container'),
         filesystem: { fs, sh, Path, Buffer },
         cmdline: "root=/dev/sda console=ttyS0 rootfstype=ext4  init=/init rw  tsc=reliable mitigations=off random.trust_cpu=on",
-        autostart: true,
-        virtio_console: true
+        autostart: true
       });
+
+
+      globalThis['emulator'] = emulator;
       const collector = new Uint8Array(512);
+
       let cursor = 0;
-      let dmaBufferAddress = 0;
       function onSerialLine(string: string) {
         // console.log(string);
         if (string.indexOf("ptr") === 0) {
-          console.log("here");
+          // console.log("here");
           console.log(string.substring(3, string.indexOf(" ")));
           dmaBufferAddress = parseInt(string.substring(3, string.indexOf(" ")));
           rx_addr = parseInt(string.substring(string.indexOf(" ") + 1));
-          emulator.write_memory([1], dmaBufferAddress);
-          // setInterval(msg_loop.bind(null, emulator), 20);
+
+          setInterval(msg_loop.bind(null, emulator), 20);
         }
       }
       /*eslint-enable*/
-      console.log(emulator);
+      // console.log(emulator);
 
       // let pd = new WebAssembly.Memory({"initial": 500});
       // let pd = new WebAssembly.Memory({"initial": 500});
@@ -778,7 +1111,6 @@ function XTermComponent() {
         }
       })
       temr.onData((d) => {
-        console.log(d.charCodeAt(0));
         send(d);
       })
     })();
@@ -821,7 +1153,7 @@ function XTermComponent() {
   }, [reference]);
   const mouseState = { down: false, cb: null };
   const mouseDown: React.MouseEventHandler = function (s) {
-    console.log('hi')
+    // console.log('hi')
     mouseState.down = true;
     terminalRef.current.style.height = `0px`;
 
@@ -830,10 +1162,10 @@ function XTermComponent() {
       terminalRef.current.style.maxHeight = `${terminalRef.current.parentElement.clientHeight - evt.clientY}px`;
 
       newref.current.style.maxHeight = `${evt.clientY}px`;
-      console.log(newref.current);
+      // console.log(newref.current);
       evt.preventDefault()
-      console.log(evt.clientY);
-      console.log(fadd);
+      // console.log(evt.clientY);
+      // console.log(fadd);
     }
     mouseState.cb = resize;
     document.body.style.userSelect = "none";
@@ -856,7 +1188,7 @@ function XTermComponent() {
   const mouseStateSide = {};
   const r = useRef(null);
   const mouseDownSize: React.MouseEventHandler = function (s) {
-    console.log('hi')
+    // console.log('hi')
     mouseStateSide.down = true;
     // reference.current.style.height = `0px`;
 
@@ -864,10 +1196,10 @@ function XTermComponent() {
       m.current.layout();
       reference.current.style.width = `${evt.clientX}px`
       r.current.style.width = `${evt.clientX}px`
-      console.log(newref.current);
+      // console.log(newref.current);
       evt.preventDefault()
-      console.log(evt.clientY);
-      console.log(fadd);
+      // console.log(evt.clientY);
+      // console.log(fadd);
     }
     mouseStateSide.cb = resize;
     document.body.style.userSelect = "none";
@@ -888,7 +1220,7 @@ function XTermComponent() {
     document.removeEventListener("mousemove", mouseStateSide.cb);
   }
   return (
-    <div className="flex flex-col h-screen max-h-screen  w-screen">
+    <div className="flex flex-col h-screen max-h-screen  w-screen overflow-hidden">
       <div className="relative flex flex-row flex-grow flex-1 " ref={newref}>
         <SideFileBar refd={reference} />
         <div className="flex-shrink " style={{ maxWidth: "20px", width: "20px", backgroundColor: "gray", cursor: "column-resize" }} onMouseDown={mouseDownSize} onMouseUp={mouseUpSide}></div>
@@ -898,7 +1230,7 @@ function XTermComponent() {
       </div>
       <div style={{ backgroundColor: 'white', height: "1px", padding: "2px", cursor: "row-resize" }} ref={dragBar} onMouseDown={mouseDown} onMouseUp={mouseUp}></div>
       <div style={{ backgroundColor: 'black', height: "1px", padding: "2px" }}></div>
-      <div className="flex-shrink" ref={terminalRef}></div>
+      <div className="flex-shrink" ref={terminalRef} style={{ minHeight: "98px" }} id="xtermref"></div>
       <div style={{ display: "none", backgroundColor: "rgba(50, 50,50)", opacity: "0.85", minWidth: "70px" }} id="cmenu">
 
       </div>

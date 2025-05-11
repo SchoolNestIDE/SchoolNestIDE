@@ -1,0 +1,46 @@
+syntax = "proto3";
+enum Type {
+    ERROR = 0;
+    OPENDIR = 1;
+    READDIR = 2;
+    CLOSEDIR = 3;
+
+}
+message Stat {
+    dev_t 
+
+}
+message ReaddirRequest {
+    int32 dirid = 1;
+}
+message ReaddirResponse {
+    repeated string names = 2;
+}
+message OpendirRequest {
+    string path = 1;
+}
+message OpendirResponse {
+    int32 dirid = 1;
+}
+message ClosedirRequest {
+    int32 dirid = 1;
+}
+message ClosedirResponse {
+}
+message Error {
+    string error = 1;
+}
+message Protocol {
+    optional Type type = 1; 
+    optional ReaddirRequest readDirRequest = 2;
+    optional OpendirRequest openDirRequest = 3;
+    optional ClosedirRequest closeDirRequest = 4;
+    
+};
+message ProtocolResponse {
+    optional Type type = 1; 
+    optional ReaddirResponse readDirResponse = 2;
+    optional OpendirResponse openDirResponse = 3;
+    optional ClosedirResponse closeDirResponse = 4;
+    optional Error error = 5;
+};
