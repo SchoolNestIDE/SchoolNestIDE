@@ -204,25 +204,8 @@ int main(int argc, char const *argv[])
     printf("ptr%lu %lu\n", physaddr, physaddr_tx);
     FILE* f = fopen("/tmp/sv.log", "wb");
     while (true) {
-        std::vector<pollfd> pfds;
         std::vector<ActiveConnection> connToUpdate;
-        int m = 0;
-        for (ActiveConnection conn : activeConnection) {
-          pollfd& pfd  = pfds.emplace_back();
-          pfd.fd = conn.fd;
-          pfd.events = POLLIN;
-          pfd.revents = 0;
-          
-        }
-        poll(pfds.data(), pfds.size(), 0);
-        for (pollfd p : pfds) {
-          // printf("%d\n", p.revents);
-          if (p.revents & POLLIN) {
-            // printf("Has to be updated\n");
-            connToUpdate.push_back(activeConnection.at(m));
-          }
-          m++;
-        }
+        
         ProtocolWrapper* rx = (ProtocolWrapper*) (ipc_buffer_rx + 1);
 
         ProtocolWrapper* tx = (ProtocolWrapper*) (ipc_buffer_tx + 1); 
