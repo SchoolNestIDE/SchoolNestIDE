@@ -21,7 +21,9 @@ disk: docker
 	@echo "Created disk"
 	cd ..
 clean-disk:
-	rm public/disk
-	rm public/disk.gz
-	rm disktemplate/output.tar
+	rm public/disk || :
+	rm public/disk.gz || :
+	rm disktemplate/output.tar || :
+	docker stop nestdocker && docker rm nestdocker || :
+	docker rmi nestdocker || :
 clean: clean-disk

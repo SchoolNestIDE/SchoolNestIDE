@@ -1,6 +1,6 @@
 FROM i386/alpine
 RUN apk update
-RUN apk add clang-extra-tools wget openrc sudo nano vim g++ gcc python3 py3-pip py3-virtualenv clang nodejs git bash
+RUN apk add util-linux clang-extra-tools wget openrc sudo nano vim g++ gcc python3 py3-pip py3-virtualenv clang nodejs git bash
 #RUN pip3 install venv
 RUN adduser -D nest
 WORKDIR /home/nest
