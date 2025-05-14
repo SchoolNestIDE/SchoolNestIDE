@@ -1,5 +1,5 @@
 #!/bin/bash
-docker build -t nestdocker .
+DOCKER_BUILDKIT=1 docker build --platform linux/i386 -t nestdocker .
 docker run -d -it --name nestdocker nestdocker
 docker export nestdocker > output.tar
 truncate -s 1G ../public/disk
@@ -8,7 +8,7 @@ mkfs.ext4 ../public/disk
 MOUNT_DIR=$(mktemp -d)
 sudo mount ../public/disk "$MOUNT_DIR"
 sudo tar -C "$MOUNT_DIR" -xvf output.tar
-sudo g++ -m32 -static ../nest_client/*.cc -o "${MOUNT_DIR}/usr/bin/nest_client"
+make -C .. docker
 sudo umount "$MOUNT_DIR"
 
 echo "Compressing disk"

@@ -7,10 +7,15 @@ run:
 
 prepare:
 	mkdir -p gen
+	mkdir -p out
 	protoc $(SRCS_PROTO) --cpp_out=gen --js_out=import_style=commonjs,binary:gen 
 
 compile: prepare
-	i686-linux-gnu-g++ -static $(INCLUDE_DIRS) $(SRCS_C) $(SRCS_PROTO_C) -lprotobuf  -o md
+	i686-linux-gnu-g++ -static $(INCLUDE_DIRS) $(SRCS_C) $(SRCS_PROTO_C) -lprotobuf  -o out/nest-client
 docker:
 	docker build -t nest_client .
 	docker run --privileged --rm -v $(shell pwd):/app nest_client make -C /app -f Makefile compile
+all: docker
+	cd disktemplate && bash main.sh
+	echo "Created disk"
+	cd ..

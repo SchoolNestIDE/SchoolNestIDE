@@ -6,7 +6,7 @@ import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import * as ps from 'path';
 import { urlToHttpOptions } from 'url';
-
+import * as octokit from '@octokit/rest'
 const mimeType = require('mime-types');
 globalThis['proto'] = require('../../../../gen/nest_client/nest_client_pb.js');
 
@@ -139,8 +139,16 @@ function createNewFile() {
   }
   parentTillTarget(pat);
 }
+function octokitSetup() {
+
+ 
+}
 contextMenuState.addSection("create-new-file", "Create new file", (ev: PointerEvent) => {
   createNewFile();
+
+}, "#cmenurelev");
+contextMenuState.addSection("push-file", "Push folder", (ev: PointerEvent) => {
+
 
 }, "#cmenurelev");
 contextMenuState.addSection("rename", "Rename file", (ev: PointerEvent) => {
