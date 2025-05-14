@@ -8,7 +8,7 @@ mkfs.ext4 ../public/disk
 MOUNT_DIR=$(mktemp -d)
 sudo mount ../public/disk "$MOUNT_DIR"
 sudo tar -C "$MOUNT_DIR" -xvf output.tar
-make -C .. docker
+#make -C .. docker
 sudo umount "$MOUNT_DIR"
 
 echo "Compressing disk"

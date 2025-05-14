@@ -15,7 +15,12 @@ compile: prepare
 docker:
 	docker build -t nest_client .
 	docker run --privileged --rm -v $(shell pwd):/app nest_client make -C /app -f Makefile compile
-all: docker
+disk: docker
 	cd disktemplate && bash main.sh
-	echo "Created disk"
+	@echo "Created disk"
 	cd ..
+clean-disk:
+	rm public/disk
+	rm public/disk.gz
+	rm disktemplate/output.tar
+clean: clean-disk
