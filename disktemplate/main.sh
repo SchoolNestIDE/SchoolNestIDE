@@ -11,7 +11,8 @@ sudo tar -C "$MOUNT_DIR" -xvf output.tar
 #make -C .. docker
 sudo cp -rvf ../out/nest-client "${MOUNT_DIR}"/bin/nest-client
 sudo chown 0:0 "${MOUNT_DIR}"/bin/nest-client
-sudo setcap "cap_sys_admin=ep" /bin/nest-client 
+sudo setcap "cap_sys_admin=ep" "$MOUNT_DIR"/bin/nest-client 
+sudo cp ./run_as_nc.sh "${MOUNT_DIR}"/run_as_nc.sh
 sudo umount "$MOUNT_DIR"
 
 echo "Compressing disk"

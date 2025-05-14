@@ -4,6 +4,8 @@ SRCS_PROTO_C=$(addprefix gen/,$(SRCS_PROTO:.proto=.pb.cc))
 INCLUDE_DIRS=-Igen/
 run: 
 	npm run dev
+disk-only:
+	cd disktemplate && bash main.sh
 download-linux-kernel:
 	wget https://storage.googleapis.com/munydev.appspot.com/vmlinuz-virt -O public/vmlinuz-virt
 prepare: download-linux-kernel

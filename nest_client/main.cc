@@ -189,7 +189,8 @@ int main(int argc, char const *argv[])
     ipc_buffer_rx = (char*) mmap(NULL, 65536, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
 
     ipc_buffer_tx = (char*) mmap(NULL, 65536, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
-
+memset(ipc_buffer_rx, 0, 65536);
+memset(ipc_buffer_tx, 0, 65536);
     printf("%p\n", ipc_buffer_rx);
     uintptr_t physaddr = -1;
     uintptr_t physaddr_tx = -1;
