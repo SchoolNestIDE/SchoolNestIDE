@@ -9,7 +9,7 @@ function walk(path, recursiveCB, endCB) {
                 return new Promise((resolve) => {
                     let fd = p.normalize(path + p.sep + file);
                     fs.stat(fd, (err, stat) => {
-                        console.log(err);
+                        //console.log(err);
                         if (stat.isDirectory()) {
                             walk(fd, recursiveCB, () => { }).then(resolve);
                         }
@@ -47,7 +47,8 @@ walk(inputtedPath, async (path) => {
     return new Promise((resolve) => {
         fs.readFile(path, (err, data) => {
             let md = crypto.hash("SHA-256", new Uint8Array(data), 'hex');
-            let mc = path.split(inputtedPath)[1];
+            console.log(md);
+	    let mc = path.split(inputtedPath)[1];
             obj[mc] = md;
             resolve();
         });

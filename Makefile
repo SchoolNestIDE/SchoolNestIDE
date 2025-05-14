@@ -4,8 +4,9 @@ SRCS_PROTO_C=$(addprefix gen/,$(SRCS_PROTO:.proto=.pb.cc))
 INCLUDE_DIRS=-Igen/
 run: 
 	npm run dev
-
-prepare:
+download-linux-kernel:
+	wget https://storage.googleapis.com/munydev.appspot.com/vmlinuz-virt -O public/vmlinuz-virt
+prepare: download-linux-kernel
 	mkdir -p gen
 	mkdir -p out
 	protoc $(SRCS_PROTO) --cpp_out=gen --js_out=import_style=commonjs,binary:gen 

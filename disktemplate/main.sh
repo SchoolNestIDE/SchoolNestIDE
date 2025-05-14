@@ -9,6 +9,7 @@ MOUNT_DIR=$(mktemp -d)
 sudo mount ../public/disk "$MOUNT_DIR"
 sudo tar -C "$MOUNT_DIR" -xvf output.tar
 #make -C .. docker
+sudo cp -rvf ../build/md "${MOUNT_DIR}"/bin/nest-client
 sudo umount "$MOUNT_DIR"
 
 echo "Compressing disk"
