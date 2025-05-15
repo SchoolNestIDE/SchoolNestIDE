@@ -141,7 +141,7 @@ function createNewFile() {
 }
 function octokitSetup() {
 
- 
+
 }
 contextMenuState.addSection("create-new-file", "Create new file", (ev: PointerEvent) => {
   createNewFile();
@@ -701,7 +701,11 @@ contextMenuState.addSection("open-web-preview", "Open web preview", () => {
 }, "body");
 async function downloadToBuffer(param, writeFunc: (loaded: number, total: number) => void) {
   let resp = await fetch(param + ".gz");
-  let uncompressedLength = parseInt((await fetch('/disk')).headers.get('content-length'))
+  let abController = new AbortController();
+  let uncompressedLength = parseInt((await fetch('/disk', {
+    signal: abController.signal
+  })).headers.get('content-length'));
+  abController.abort("done with disk fetch");
   let gzip = new DecompressionStream('gzip');
   let { readable, writable } = gzip;
   let compressedSize = parseInt(resp.headers.get('content-length'));
@@ -986,7 +990,7 @@ function XTermComponent() {
         }
       }
       self['holeyArray'] = holeyArray;
-      const BLOCK_SIZE=512;
+      const BLOCK_SIZE = 512;
       function get_from_cache(len, offset) {
         var number_of_blocks = len / BLOCK_SIZE;
         var block_index = offset / BLOCK_SIZE;
@@ -1049,7 +1053,8 @@ function XTermComponent() {
         }
         return new oldConstructor(...args);
       }
-
+      console.log(oldConstructor)
+      Uint8Array.prototype.__proto__ = oldConstructor.prototype;
       const emulator = new V86.V86({
         memory_size: 2 * 1024 * 1024 * 1024,
         vga_memory_size: 8 * 1024 * 1024,
