@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import * as ps from 'path';
 import { urlToHttpOptions } from 'url';
 import * as octokit from '@octokit/rest'
+import { IconBrandAdobeAfterEffect } from '@tabler/icons-react';
 const mimeType = require('mime-types');
 globalThis['proto'] = require('../../../../gen/nest_client/nest_client_pb.js');
 
@@ -699,7 +700,7 @@ globalThis['send_conn'] = send_connect_packet;
 contextMenuState.addSection("open-web-preview", "Open web preview", () => {
   open_webviewer();
 }, "body");
-async function downloadToBuffer(param, writeFunc: (loaded: number, total: number) => void) {
+async function downloadToBuffer(param, writeFunc: (loaded: number, total: number) => void, toSave) {
   let resp = await fetch(param + ".gz");
   let abController = new AbortController();
   let uncompressedLength = parseInt((await fetch('/disk', {
@@ -711,7 +712,8 @@ async function downloadToBuffer(param, writeFunc: (loaded: number, total: number
   let compressedSize = parseInt(resp.headers.get('content-length'));
   let wasmMemory = new WebAssembly.Memory({ initial: Math.ceil(uncompressedLength / 65536) });
   wasmMemory.cursor = 0;
-  return new Promise(resolve => {
+  return new Promise(async (resolve) => {
+    let qq = null;
     let ws = new WritableStream({
       write: (chunk) => {
         // wasmMemory.grow(1);
@@ -728,7 +730,21 @@ async function downloadToBuffer(param, writeFunc: (loaded: number, total: number
       close: resolve.bind(null, wasmMemory.buffer)
     }, new ByteLengthQueuingStrategy({ highWaterMark: 65536 }));
     readable.pipeTo(ws);
-    resp.body.pipeTo(writable);
+    let [r1, r2] = resp.body?.tee(writable);
+    r1.pipeTo(writable);
+    let rrr = r2.getReader();
+    let chunks = [];
+    let c = { done: false, value: null };
+    while (!c.done) {
+      c = await rrr.read();
+      if (c.done) {
+        break;
+
+      }
+      chunks.push(Buffer.from(c.value));
+    }
+    let realChunks = Buffer.concat(chunks);
+    toSave(realChunks);
   });
 }
 function wrap<T>(result: IDBRequest<T>) {
@@ -762,20 +778,23 @@ async function ensureDB() {
 }
 async function alwaysDownload(path, writeFunc) {
   let db = await ensureDB();
-  let buffer: ArrayBuffer = await downloadToBuffer(DOWNLOAD_PREFIX + path, (loaded, total) => {
+  let j = await (await fetch(DOWNLOAD_PREFIX + '/hashes.json')).json()
+
+  let buffer = await downloadToBuffer(DOWNLOAD_PREFIX + path, (loaded, total) => {
     let progressInPercentage: string = `${loaded * 100 / total}%\r`;
     writeFunc(progressInPercentage);
 
+  }, async (buf) => {
+    let s = db.transaction('responses', 'readwrite');
+
+    let store = s.objectStore('responses');
+    await wrap(store.put({ path: path, buf, hash: j[path + ".gz"] }));
+    writeFunc("saving");
+    await new Promise(resolve => s.oncomplete = resolve);
   });
 
-  let j = await (await fetch(DOWNLOAD_PREFIX + '/hashes.json')).json()
   // let hash = await crypto.subtle.digest("SHA-256", buffer);
-  let s = db.transaction('responses', 'readwrite');
 
-  let store = s.objectStore('responses');
-  await wrap(store.put({ path: path, buffer, hash: j[path] }));
-  writeFunc("saving");
-  await new Promise(resolve => s.oncomplete = resolve);
   return buffer;
 }
 function showRename(path, switchTo = false) {
@@ -854,7 +873,7 @@ async function getOrFetchResponse(path, writeFunc) {
   } else {
     let p = await fetch(DOWNLOAD_PREFIX + '/hashes.json');
     let hashes = await p.json();
-    let hash: string = hashes[path];
+    let hash: string = hashes[path + ".gz"];
     transaction = db.transaction(["responses"], 'readwrite');
     objectStore = transaction.objectStore('responses');
     writeFunc("found in cache\n");
@@ -869,7 +888,29 @@ async function getOrFetchResponse(path, writeFunc) {
       return await alwaysDownload(path, writeFunc);
 
     }
-    return md.buffer;
+    let decompressionStream = new DecompressionStream('gzip');
+    let { readable: r, writable: w } = decompressionStream;
+    let rr = r.getReader();
+    let chunks = [];
+    let totalLength = 0;
+    let ww = w.getWriter();
+    
+      ww.write(md.buf).then (()=>{
+        ww.close();
+      });
+     
+    while (true) {
+      let c = await rr.read();
+              console.log(c)
+      if (c.done) {
+        return Buffer.concat(chunks).buffer;
+      }
+      
+        totalLength +=c.value.length;
+        console.log(totalLength);
+        chunks.push(c.value);
+      
+    }
 
   }
 
@@ -1032,6 +1073,7 @@ function XTermComponent() {
           }
         }
       };
+      console.log(buffer.byteLength);
       Uint8Array = function (...args) {
         if (args.filter(v => v instanceof ArrayBufferExt).length > 0) {
           while (true) {

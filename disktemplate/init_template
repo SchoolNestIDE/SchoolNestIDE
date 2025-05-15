@@ -1,4 +1,5 @@
 #!/bin/bash
+DISK_SIZE=((SIZE))
 packed_hosts() {
 cat <<EOF
 # Standard host addresses
@@ -32,6 +33,9 @@ echo "Project is located at ~"
 cd /home/nest
 hostname nest
 nest-client &
+losetup -o $((DISK_SIZE/512)) -fP /dev/sda
+mkfs.ext4 /dev/loop0
+mount -o rw /dev/loop0 /home/nest
 nc -lk -p 6061 -e bash -c "source /run_as_nc.sh; exec bash 2>&1" & #insecure but allows webapp to access bash shell with apis/extensions
 sudo -u nest script -q -c "/bin/bash" /dev/null
 

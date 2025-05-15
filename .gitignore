@@ -48,4 +48,5 @@ disktemplate/output.tar
 *.pb.*
 gen
 compile_commands.json
-package-lock.json./build
+package-lock.json
+disktemplate/init
