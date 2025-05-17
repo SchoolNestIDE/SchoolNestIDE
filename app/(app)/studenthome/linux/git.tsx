@@ -1,4 +1,6 @@
 
+const ps = require('path');
+
 function walk(fs: typeof import('fs'), path: string, recursiveCB: (parent: string, filename: string, stat: import('fs').Stats, depth: number) => Promise<void>, endCB: () => void, depth: number = 0) {
   return new Promise<void>((resolve) => {
     fs.readdir(path, (_, files) => {
@@ -31,14 +33,20 @@ function walk(fs: typeof import('fs'), path: string, recursiveCB: (parent: strin
 
 const API = {
     _createGitTree(fs: typeof import('fs')) {
-        return new Promise((resolve) => {
-            const tree = {};
-            walk(fs, "/", async(p,n,st)=>{
-                const baseTreeURL = `https://api.github.com/repos/${}`;
-            }, ()=>{
-                resolve(true);
-            });
-        });
+        return null;
     }
 };
-export default API;
+
+function GitPanel (params: {
+  none: string
+}) {
+  return (
+    <>
+    <h1>Hi</h1>
+    </>
+  )
+}
+export {
+  API,
+  GitPanel
+}

@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <libgen.h>
 #include <stdint.h>
@@ -186,9 +187,9 @@ const size_t kChunkSize = 1500;
 int main(int argc, char const *argv[])
 { 
 
-    ipc_buffer_rx = (char*) mmap(NULL, 65536, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    ipc_buffer_rx = (char*) mmap(NULL, 1024 * 1024 * 4, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
 
-    ipc_buffer_tx = (char*) mmap(NULL, 65536, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    ipc_buffer_tx = (char*) mmap(NULL, 1024 * 1024 * 4, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
 memset(ipc_buffer_rx, 0, 65536);
 memset(ipc_buffer_tx, 0, 65536);
     printf("%p\n", ipc_buffer_rx);
@@ -268,6 +269,9 @@ memset(ipc_buffer_tx, 0, 65536);
           if (rx->msgType == DATA) {
             DataPkt* d = (DataPkt*) rx->message;
             uint32_t id = d->connId;
+            uintptr_t offsetInto = (uintptr_t) d - (uintptr_t) ipc_buffer_rx;
+            uintptr_t chunkSize = 1024 * 1024 * 4 - offsetInto;
+            
             while (1) {
             if (id >= activeConnection.size()) {
               // handle error later

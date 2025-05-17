@@ -40,6 +40,7 @@
     "clsx": "^2.1.1",
     "dayjs": "^1.11.13",
     "framer-motion": "^11.11.17",
+    "fzstd": "^0.1.1",
     "google-protobuf": "^3.21.4",
     "gray-matter": "^4.0.3",
     "lucide-react": "^0.479.0",

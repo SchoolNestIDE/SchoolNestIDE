@@ -1,6 +1,6 @@
 //@ts-nocheck
 "use client";
-import React, { useEffect, useRef, } from 'react';
+import React, { Ref, useEffect, useRef, useState, } from 'react';
 import "xterm/css/xterm.css"
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
@@ -8,6 +8,8 @@ import * as ps from 'path';
 import { urlToHttpOptions } from 'url';
 import * as octokit from '@octokit/rest'
 import { IconBrandAdobeAfterEffect } from '@tabler/icons-react';
+import { GitPanel } from './git.tsx';
+import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from '@nextui-org/react';
 const mimeType = require('mime-types');
 globalThis['proto'] = require('../../../../gen/nest_client/nest_client_pb.js');
 
@@ -416,6 +418,7 @@ const memoryContextSettings: {
     return this.unorderedList;
   },
   actualUpdateCB: function () {
+    if (!this.reference) return;
     if (!this.fs) { return; }
     let fd: typeof import('fs') = this.fs;
     // console.log(fd);
@@ -491,15 +494,24 @@ const memoryContextSettings: {
         p();
       }
     })
-
+    return true; //gotten through
 
   },
   invalidationCB: function () {
     if (this.currentTask) return;
-    this.currentTask = setTimeout(this.actualUpdateCB.bind(this), 10);
+    this.currentTask = setTimeout(function () {
+
+      let r = memoryContextSettings.actualUpdateCB();
+      if (!r) {
+        memoryContextSettings.currentTask = null;
+
+        memoryContextSettings.invalidationCB();
+      }
+    }, 10);
   }
 
 };
+globalThis['mem'] = memoryContextSettings;
 async function downloadV86() {
   let v = await fetch("/libv86.mjs");
   let str = await v.text();
@@ -513,10 +525,12 @@ const MSGS = {
   CLOSE_FILE: 1,
 
 }
-let viewable_url = "http://localhost:8080/bootstrap.html";
+
 
 let rx_addr = 0;
 function open_webviewer() {
+  let viewable_url = `${location.protocol}//${location.host}:8080/bootstrap.html`;
+
   let w = open(viewable_url, "web_ipc");
   setTimeout(() => {
     let mc = new MessageChannel();
@@ -571,12 +585,12 @@ function msg_loop(emulator: any) {
   msg_loop.ids = msg_loop.ids ?? [];
   msg_loop.buffers = msg_loop.buffers ?? [];
   msg_loop.totalSize = 0;
-
+  const dmaBufferSize = 1024 * 1024 * 4;
   if (emulator.read_memory(rx_addr, 1)[0] == 1) {
 
-    let buf = emulator.read_memory(rx_addr + 1, 65536) as Uint8Array
+    let buf = emulator.read_memory(rx_addr + 1, dmaBufferSize) as Uint8Array
 
-    let dv = new DataView(buf.buffer, buf.byteOffset, 65536);
+    let dv = new DataView(buf.buffer, buf.byteOffset, dmaBufferSize);
     // console.log(dv.getUint32(0, true));
 
     if (dv.getUint32(0, true) === 2 || dv.getUint32(0, true) === 1) /* DATA or DISCONNECT*/ {
@@ -595,7 +609,7 @@ function msg_loop(emulator: any) {
       let msgId = dv.getUint32(4, true);
       // console.log(msgId);
       if (msg_loop.ids[msgId]) {
-        msg_loop.ids[msgId](new Uint8Array(dv.buffer, dv.byteOffset + 8, 65536 - 8));
+        msg_loop.ids[msgId](new Uint8Array(dv.buffer, dv.byteOffset + 8, dmaBufferSize - 8));
         //delete msg_loop.ids[msgId];
       }
     }
@@ -668,7 +682,7 @@ function send_connect_packet(port, handler, connectionId = (num) => { }) {
       if (typeof buf === "string") {
         send_data_pkt(this.connId, new TextEncoder().encode(buf));
 
-      } else if (buf instanceof Uint8Array) {
+      } else {
 
         send_data_pkt(this.connId, buf);
 
@@ -760,10 +774,13 @@ function wrap<T>(result: IDBRequest<T>) {
 async function ensureDB() {
   if (self.openDatabase) return self.openDatabase;
   return new Promise<IDBDatabase>((resolve) => {
-    let p = indexedDB.open("response-storage", 100);
+    let p = indexedDB.open("response-storage", 200);
     p.onupgradeneeded = (ev) => {
       let database = p.result;
       database.createObjectStore("responses", {
+        "keyPath": "path"
+      });
+      database.createObjectStore("persistent-disk", {
         "keyPath": "path"
       });
       self.openDatabase = database;
@@ -894,22 +911,20 @@ async function getOrFetchResponse(path, writeFunc) {
     let chunks = [];
     let totalLength = 0;
     let ww = w.getWriter();
-    
-      ww.write(md.buf).then (()=>{
-        ww.close();
-      });
-     
+
+    ww.write(md.buf).then(() => {
+      ww.close();
+    });
+
     while (true) {
       let c = await rr.read();
-              console.log(c)
       if (c.done) {
         return Buffer.concat(chunks).buffer;
       }
-      
-        totalLength +=c.value.length;
-        console.log(totalLength);
-        chunks.push(c.value);
-      
+
+      totalLength += c.value.length;
+      chunks.push(c.value);
+
     }
 
   }
@@ -918,6 +933,46 @@ async function getOrFetchResponse(path, writeFunc) {
 let dmaBufferAddress = 0;
 
 globalThis['creates'] = createConnectPacket;
+async function getOrCreatePersistentData() {
+  let map;
+  let db = await ensureDB();
+  let t = db.transaction(['persistent-disk'], 'readwrite')
+  let osto = t.objectStore("persistent-disk");
+  let c = (await wrap(osto.get("/")))
+  if (!c) {
+    map = new Map();
+  } else {
+    console.log(c);
+    map = c.map;
+  }
+  let persistData = async () => {
+    let db = await ensureDB();
+    let t = db.transaction(['persistent-disk'], 'readwrite')
+    let osto = t.objectStore("persistent-disk");
+    await wrap(osto.put({
+      path: "/",
+      map
+    }));
+
+  }
+  return {
+    map,
+    persistData
+  };
+}
+let willBeDone = false;
+function persist(persistFunc) {
+  console.log("[info] trying to persist")
+  if (willBeDone) {
+    return;
+  }
+  willBeDone = true;
+  setTimeout(async function () {
+    console.log('actuallyp')
+    await persistFunc();
+    willBeDone = false;
+  }, 2000);
+}
 function XTermComponent() {
   const terminalRef = useRef(null);
   const dragBar = useRef(null);
@@ -933,7 +988,6 @@ function XTermComponent() {
 
     (async () => {
       var fs;
-      memoryContextSettings.reference = reference.current;
 
       const xterm = await import('xterm');
       if (!terminalRef.current) return;
@@ -1020,8 +1074,9 @@ function XTermComponent() {
         console.log("ArrayBuffer.prototype.slice")
         oldSlice.apply(this, args);
       }
+
       let oldConstructor = Uint8Array;
-      let holeyArray = new Map();
+      let { map: holeyArray, persistData } = await getOrCreatePersistentData();
       class ArrayBufferExt extends ArrayBuffer {
         get byteLength() {
           return 12 * 1024 * 1024 * 1024; // 12GB but not actually
@@ -1066,12 +1121,14 @@ function XTermComponent() {
           const cached_block = holeyArray.get(start_block + i);
 
           if (cached_block) {
-            block.set(cached_block, i * BLOCK_SIZE);
+            cached_block.set(block.slice(i * BLOCK_SIZE, (i + 1) * BLOCK_SIZE), 0);
           }
           else if (true) {
             holeyArray.set(start_block + i, block.slice(i * BLOCK_SIZE, (i + 1) * BLOCK_SIZE));
           }
         }
+        persist(persistData);
+
       };
       console.log(buffer.byteLength);
       Uint8Array = function (...args) {
@@ -1085,12 +1142,19 @@ function XTermComponent() {
             if (offset <= buffer.byteLength && offset + length <= buffer.byteLength) {
               break;
             }
-            console.log("oob access resoultion")
-            let v = get_from_cache(length, offset);
-            if (!v) {
+            let bm = get_from_cache(length, offset);
+            if (!bm) {
               fds(offset, length, new oldConstructor(length));
+              bm = get_from_cache(length, offset);
+
             }
-            return get_from_cache(length, offset);
+            let origSet = bm.set;
+            bm.set = function (b, off) {
+              console.log("writing pr");
+              Uint8Array.prototype.set.apply(this, [...arguments]);
+              fds(offset, b.length, b);
+            }
+            return bm;
           }
         }
         return new oldConstructor(...args);
@@ -1171,7 +1235,14 @@ function XTermComponent() {
     })();
     k = 1;
   }, [terminalRef, dragBar, reference]);
+  useEffect(()=>{
+    if (!reference.current) {
+      return;
+    }
+      memoryContextSettings.reference = reference.current;
+    memoryContextSettings.invalidationCB();
 
+  }, [reference]);
   function handleEditorDidMount(editor) {
     m.current = editor;
     editorContext.editor = editor;
@@ -1274,11 +1345,13 @@ function XTermComponent() {
     }, 200);
     document.removeEventListener("mousemove", mouseStateSide.cb);
   }
+  let [elem, setElem] = useState((<SideFileBar refd={reference} />));
+
   return (
     <div className="flex flex-col h-screen max-h-screen  w-screen overflow-hidden">
       <div className="relative flex flex-row flex-grow flex-1 " ref={newref}>
-        <SideFileBar refd={reference} />
-        <div className="flex-shrink " style={{ maxWidth: "20px", width: "20px", backgroundColor: "gray", cursor: "column-resize" }} onMouseDown={mouseDownSize} onMouseUp={mouseUpSide}></div>
+        <FullPanel fileRef={reference} />
+        <div className="flex-shrink " style={{ minWidth: "20px", width: "20px", backgroundColor: "gray", cursor: "column-resize" }} onMouseDown={mouseDownSize} onMouseUp={mouseUpSide}></div>
         <div className={`relative flex-grow`} ref={r}>
           {editor}
         </div>
@@ -1293,14 +1366,109 @@ function XTermComponent() {
 
   );
 }
-function SideFileBar(f) {
+const DropdownSwitcherState = {
+
+}
+
+function DropdownSelector(props) {
+  return (
+    <Dropdown>
+      <DropdownTrigger>
+        <div style={{ fontSize: "18pt" }}>{props.name}</div>
+      </DropdownTrigger>
+      <DropdownMenu onAction={props.onAction}>
+
+        <DropdownItem key="files">
+          Files
+        </DropdownItem>
+        <DropdownItem key="git">
+          Git
+        </DropdownItem>
+      </DropdownMenu>
+    </Dropdown>
+  );
+}
+
+function FullPanel(props: {
+  fileRef: any
+}) {
+  const { fileRef: reference } = props;
+
+  const panels = {
+    "files": {
+      name: "Files",
+      Component: () => <SideFileBar refd={reference} />,
+      ref: useRef(null)
+    },
+    "git": {
+      name: "Git",
+      Component: GitPanel,
+      ref: useRef(null)
+    }
+  };
+
+
+  const [activePanel, setActivePanel] = useState("Files");
+  const [panelId, setPanelId] = useState("files");
+  function switcher(toSwitch: string) {
+    if (panels[toSwitch]) {
+      let a = panels[panelId].ref;
+      if (a.current) {
+        a.current.style.display = "none";
+      }
+      if (panels[toSwitch].ref) {
+        let r = panels[toSwitch].ref;
+        let el = r.current;
+        el.style.display = "block";
+        setPanelId(toSwitch);
+        setActivePanel(panels[toSwitch].name);
+        return;
+      }
+
+    }
+
+  }
+  
+  useEffect(()=>{
+    setTimeout(()=>{
+      switcher('files');
+    })
+  },[panels.files.ref]);
+  return (
+    <div style={{ minWidth: "10%" }}>
+      <div>
+        <DropdownSelector onAction={switcher} name={activePanel} />
+      </div>
+      <div>
+        {Object.values(panels).map((a) => {
+          useEffect(()=>{
+            console.log(a.ref);
+            if (!a.ref.current) {
+              return;
+            }
+            a.ref.current.style.display = "none";
+          },[a.ref]);
+          let rElem = a.Component();
+          return (
+            <div ref={a.ref}>
+              {rElem}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  );
+}
+function SideFileBar(props: {
+  refd: any,
+
+}) {
   function back() {
     location.href = "/studenthome"
   }
 
   return (
-    <div ref={f.refd} style={{ minWidth: "10%", fontSize: "18px" }} id="cmenurelev">
-      Files
+    <div ref={props.refd} style={{ minWidth: "10%", fontSize: "18px" }} id="cmenurelev">
 
     </div>
   )

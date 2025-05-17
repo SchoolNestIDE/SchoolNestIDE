@@ -26,6 +26,6 @@ clean-disk:
 	rm public/disk || :
 	rm public/disk.gz || :
 	rm disktemplate/output.tar || :
-	docker stop nestdocker && docker rm nestdocker || :
+	docker container stop -t 2 nestdocker  && docker rm nestdocker || :
 	docker rmi nestdocker || :
 clean: clean-disk
