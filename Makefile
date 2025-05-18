@@ -2,6 +2,8 @@ SRCS_C=nest_client/main.cc
 SRCS_PROTO=nest_client/nest_client.proto
 SRCS_PROTO_C=$(addprefix gen/,$(SRCS_PROTO:.proto=.pb.cc))
 INCLUDE_DIRS=-Igen/
+HOST_PATH ?= /Users/agneyatharun/Projects/SchoolNestIDE
+
 run: 
 	npm run dev
 disk-only:
@@ -17,7 +19,7 @@ compile: prepare
 	i686-linux-gnu-g++ -static $(INCLUDE_DIRS) $(SRCS_C) $(SRCS_PROTO_C) -lprotobuf  -o out/nest-client
 docker:
 	docker build -t nest_client .
-	docker run --privileged --rm -v $(shell pwd):/app nest_client make -C /app -f Makefile compile
+	docker run --privileged --rm -v $(HOST_PATH):/app nest_client make -C /app -f Makefile compile
 disk: docker
 	cd disktemplate && bash main.sh
 	@echo "Created disk"

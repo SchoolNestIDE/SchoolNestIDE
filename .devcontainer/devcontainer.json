@@ -13,12 +13,15 @@
 		"ghcr.io/devcontainers/features/node:1": {},
 		"ghcr.io/devcontainers/features/github-cli:1": {}
 	},
-	"runArgs": ["--privileged"]
+	"runArgs": [
+        "--privileged",
+        "-v", "/var/run/docker.sock:/var/run/docker.sock"
+    ],
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// "forwardPorts": [],
+	"forwardPorts": [3000]
 
 	// Uncomment the next line to run commands after the container is created.
 	// "postCreateCommand": "cat /etc/os-release",

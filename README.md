@@ -26,3 +26,6 @@ functions directory: /netlify/functions
 
 - go to this site and install the nextjs runtime into the netlify site. [deploy nextjs to netlify](https://www.netlify.com/blog/2020/11/30/how-to-deploy-next.js-sites-to-netlify/)
 - upload the .env file to the netlify site. MAKE SURE THAT THE NEXTAUTH_URL=https://schoolnest.org
+
+
+- spin up a dev container. 
