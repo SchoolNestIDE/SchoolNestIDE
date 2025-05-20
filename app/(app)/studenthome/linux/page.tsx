@@ -776,16 +776,23 @@ async function ensureDB() {
   return new Promise<IDBDatabase>((resolve) => {
     let p = indexedDB.open("response-storage", 200);
     p.onupgradeneeded = (ev) => {
-      let database = p.result;
-      database.createObjectStore("responses", {
-        "keyPath": "path"
-      });
-      database.createObjectStore("persistent-disk", {
-        "keyPath": "path"
-      });
-      self.openDatabase = database;
+  let database = p.result;
 
-    }
+  if (!database.objectStoreNames.contains("responses")) {
+    database.createObjectStore("responses", {
+      keyPath: "path"
+    });
+  }
+
+  if (!database.objectStoreNames.contains("persistent-disk")) {
+    database.createObjectStore("persistent-disk", {
+      keyPath: "path"
+    });
+  }
+
+  self.openDatabase = database;
+}
+
     p.onsuccess = (ev) => {
       self.openDatabase = p.result;
       resolve(self.openDatabase);
