@@ -42,7 +42,7 @@ function GitPanel (params: {
 }) {
   return (
     <>
-    <h1>Hi</h1>
+    <h1>Github related information is stored here </h1>
     </>
   )
 }

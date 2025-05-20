@@ -850,11 +850,15 @@ function showContextMenu(ev: MouseEvent) {
   contextMenuState.target = ev.target;
   // console.log(ev.target);
   let elem = document.querySelector('#cmenu') as HTMLElement;
+  let oldEV = ev;
+  let oldPath = oldEV.composedPath();
   document.addEventListener('click', function a(ev) {
     elem.style.display = "none";
-    for (const partOfPath of ev.composedPath()) {
+    for (const partOfPath of oldPath) {
+      console.log('part of path', partOfPath);
       contextMenuState.relevancyMap.get(partOfPath)?.forEach((v) => {
-        v.style.display = "block";
+        v.style.display = "none"
+        console.log("hidden a file", v);
       })
     }
     document.removeEventListener('click', a);
@@ -869,6 +873,7 @@ function showContextMenu(ev: MouseEvent) {
       v.style.display = "block";
     })
   }
+  
   elem.style.position = "absolute";
   elem.style.display = "block";
   elem.style.top = `${ev.clientY - 2}px`;
@@ -1439,7 +1444,7 @@ function FullPanel(props: {
       <div>
         <DropdownSelector onAction={switcher} name={activePanel} />
       </div>
-      <div>
+      <div style={{height: "100%"}}>
         {Object.values(panels).map((a) => {
           useEffect(()=>{
             console.log(a.ref);
@@ -1450,7 +1455,7 @@ function FullPanel(props: {
           },[a.ref]);
           let rElem = a.Component();
           return (
-            <div ref={a.ref}>
+            <div ref={a.ref} style={{height: "100%"}}>
               {rElem}
             </div>
           )
@@ -1468,7 +1473,7 @@ function SideFileBar(props: {
   }
 
   return (
-    <div ref={props.refd} style={{ minWidth: "10%", fontSize: "18px" }} id="cmenurelev">
+    <div ref={props.refd} style={{ minWidth: "10%", fontSize: "18px", height:"100%"}} id="cmenurelev">
 
     </div>
   )
