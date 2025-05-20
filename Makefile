@@ -28,4 +28,13 @@ clean-disk:
 	rm disktemplate/output.tar || :
 	docker container stop -t 2 nestdocker  && docker rm nestdocker || :
 	docker rmi nestdocker || :
+	docker rm $(docker ps -aq) || :
+	docker rmi -f $(docker images -aq) ||:
 clean: clean-disk
+
+clean-full: clean
+	sudo rm -rf gen/
+	sudo rm -rf out/
+	sudo rm -rf node_modules/
+
+cleanFull: clean-full
