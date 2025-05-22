@@ -10,7 +10,7 @@ disk.gz
 __pycache__
 # testing
 /coverage
-
+yarn.lock
 # next.js
 /.next/
 /out/

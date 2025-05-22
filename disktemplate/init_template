@@ -28,7 +28,6 @@ else
 	echo "Clearing filesystem"
 	mkfs.ext4 /dev/loop0
 fi
-mount -o rw /dev/loop0 /home/nest
 ip link set lo up
 if ip link | grep -q "eth0"
 then
@@ -43,6 +42,6 @@ cd /home/nest
 hostname nest
 nest-client &
 
-nc -lk -p 6061 -e bash -c "source /run_as_nc.sh; exec bash 2>&1" & #insecure but allows webapp to access bash shell with apis/extensions
+busybox nc -lk -p 6061 -e bash -c "source /run_as_nc.sh; exec bash 2>&1" & #insecure but allows webapp to access bash shell with apis/extensions
 sudo -u nest script -q -c "/bin/bash" /dev/null
 

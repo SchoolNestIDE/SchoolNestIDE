@@ -2,6 +2,10 @@ SRCS_C=nest_client/main.cc
 SRCS_PROTO=nest_client/nest_client.proto
 SRCS_PROTO_C=$(addprefix gen/,$(SRCS_PROTO:.proto=.pb.cc))
 INCLUDE_DIRS=-Igen/
+VSCODE_COMMIT=848b80aeb52026648a8ff9f7c45a9b0a80641e2e
+VSCODE_QUALITY=stable
+HOST=localhost:3000
+URL=https://update.code.visualstudio.com/commit:$(VSCODE_COMMIT)/web-standalone/$(VSCODE_QUALITY)
 run: 
 	npm run dev
 disk-only:
@@ -26,12 +30,12 @@ clean-disk:
 	rm public/disk || :
 	rm public/disk.gz || :
 	rm disktemplate/output.tar || :
-	docker container stop -t 2 nestdocker  && docker rm nestdocker || :
+	docker container stop -t 0 nestdocker  && docker rm nestdocker || :
 	docker rmi nestdocker || :
-	docker rm $(docker ps -aq) || :
-	docker rmi -f $(docker images -aq) ||:
 clean: clean-disk
-
+public/vscode:
+	wget "$(URL)" -O /tmp/vsc.zip
+	7z x /tmp/vsc.zip 
 clean-full: clean
 	sudo rm -rf gen/
 	sudo rm -rf out/

@@ -76,10 +76,6 @@ export default async function RootLayout({
           src={`https://www.googletagmanager.com/gtag/js?id=G-3LZ78NQL76`}
         />
         <Script
-          strategy="beforeInteractive"
-          src="https://unpkg.com/filer@1.4.1/dist/filer.js"
-        ></Script>
-        <Script
           id="google-analytics"
           strategy="afterInteractive"
           dangerouslySetInnerHTML={{

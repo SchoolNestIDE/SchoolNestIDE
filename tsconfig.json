@@ -33,7 +33,7 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts"
-, "webpreview/sw.mts"  ],
+, "webpreview/sw.mts", "tailwind.config.mjs"  ],
   "exclude": [
     "node_modules"
   ]

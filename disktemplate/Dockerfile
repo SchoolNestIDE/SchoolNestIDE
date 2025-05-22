@@ -1,11 +1,9 @@
-FROM i386/alpine
-RUN apk update
-RUN apk add --no-cache util-linux clang-extra-tools \
-    wget openrc sudo nano vim g++ gcc \
-    python3 py3-pip py3-virtualenv clang \
-    nodejs git bash curl e2fsprogs racket
+FROM i386/debian
+RUN apt-get update
+RUN apt-get install  util-linux clangd wget openrc busybox clang clang python3 \
+    openjdk-17-jdk sudo iproute2 p7zip-full -y
 #RUN pip3 install venv
-RUN adduser -D nest
+RUN useradd -ms /bin/bash nest
 WORKDIR /home/nest
 #RUN git clone https://github.com/clangd/clangd
 RUN echo 'nest:pass' | chpasswd 

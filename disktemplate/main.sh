@@ -1,6 +1,6 @@
 #!/bin/bash
-truncate -s 1G ../public/disk
-truncate -s +200M ../public/disk
+truncate -s 3G ../public/disk
+
 sed  "s/((SIZE))/$(stat -c"%s" ../public/disk)/" init_template > ./init
 mkfs.ext4 ../public/disk
 docker build --platform linux/i386 -t nestdocker .
