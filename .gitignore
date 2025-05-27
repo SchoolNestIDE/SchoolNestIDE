@@ -51,3 +51,4 @@ gen
 compile_commands.json
 package-lock.json
 disktemplate/init
+static_config.json

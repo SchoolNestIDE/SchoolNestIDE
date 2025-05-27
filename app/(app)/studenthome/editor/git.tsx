@@ -1,51 +1,44 @@
-
 const ps = require('path');
-
-function walk(fs: typeof import('fs'), path: string, recursiveCB: (parent: string, filename: string, stat: import('fs').Stats, depth: number) => Promise<void>, endCB: () => void, depth: number = 0) {
-  return new Promise<void>((resolve) => {
-    fs.readdir(path, (_, files) => {
-      Promise.all<void>(files.map((file, i, arr) => {
-        return new Promise((resolve) => {
-          let fd = path + ps.sep + file;
-          if (file === "/") {
-            resolve();
-            return;
-          }
-          fs.stat(fd, async (err, stat) => {
-            await recursiveCB(path, file, stat, depth);
-            if (stat.isDirectory()) {
-              walk(fs, fd, recursiveCB, () => { }, depth + 1).then(resolve);
-
-            } else {
-              resolve();
-            };
-          })
-        });
-      })).then(() => {
-        endCB();
-        resolve();
-      })
-
-
-    })
-  });
-}
+import React from 'react';
+import * as IDB from  './indexeddb'
+import memoryContext from './filesystem';
+import { Button } from '@nextui-org/react';
 
 const API = {
     _createGitTree(fs: typeof import('fs')) {
         return null;
     }
 };
-
-function GitPanel (params: {
-  none: string
-}) {
-  return (
-    <>
-    <h1>Github related information is stored here </h1>
-    </>
-  )
+async function getOrCreateGithubToken() {
+  let resultingArray = [];
+  let db = await IDB.DB();
+  let transaction = db.transaction(["user-secret"], 'readwrite');
+  let usrSecret = transaction.objectStore('user-secret');
+  let ghToken = await usrSecret.get("github-token");
+  if (!ghToken) {
+    
+  }
 }
+const GitPanel: React.FC = () => {
+  const handlePush = () => {
+    // TODO: Implement push functionality
+    
+
+  };
+
+  const handlePull = () => {
+    // TODO: Implement pull functionality
+    alert('Pull clicked');
+  };
+
+  return (
+    <div style={{ display: 'flex', gap: '1rem', margin: '1rem 0', flexDirection: 'column' }}>
+      <Button onPress={handlePush} style={{ padding: '0.5rem 1rem' }}>Push</Button>
+      <Button onPress={handlePull} style={{ padding: '0.5rem 1rem' }}>Pull</Button>
+    </div>
+  );
+};
+
 export {
   API,
   GitPanel

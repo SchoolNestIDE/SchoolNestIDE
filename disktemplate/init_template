@@ -20,14 +20,14 @@ mkdir /workspaces
 mount -t 9p -o exec host9p /workspaces
 mount -t tmpfs /home/nest /home/nest
 packed_hosts > /etc/hosts
-losetup -o "${DISK_SIZE}" -fP /dev/sda
-if  e2fsck -n /dev/loop0
-then
-	echo "Found filesystem and mountable"
-else
-	echo "Clearing filesystem"
-	mkfs.ext4 /dev/loop0
-fi
+# losetup -o "${DISK_SIZE}" -fP /dev/sda
+# if  e2fsck -n /dev/loop0
+# then
+# 	echo "Found filesystem and mountable"
+# else
+# 	echo "Clearing filesystem"
+# 	mkfs.ext4 /dev/loop0
+# fi
 ip link set lo up
 if ip link | grep -q "eth0"
 then
