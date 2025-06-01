@@ -11,8 +11,15 @@ import {
   IconExternalLink,
   IconCoffee,
   IconCode,
-  IconFile
+  IconFile,
+  IconHome,
+  IconDeviceLaptop,
+  IconBrandGithub,
+  IconChalkboard
 } from '@tabler/icons-react';
+// Remove this import line:
+// import { FloatingNav } from "@/app/components/ui/floating-navbar";
+import { BackgroundLines } from "@/app/components/ui/background-lines";
 
 // IndexedDB helper functions
 const DB_NAME = 'JavaProjectsDB';
@@ -37,6 +44,7 @@ const openDB = () => {
     };
   });
 };
+
 
 const saveProject = async (project) => {
   const db = await openDB();
@@ -314,215 +322,350 @@ export default function ProjectManager() {
       minute: '2-digit'
     });
   };
+const dockLinks = [
+    {
+      title: "Back Home",
+      icon: <IconHome className="h-full w-full text-[#B07B50]" />,
+      href: "/studenthome",
+    },
+    {
+      title: "Java Dashboard",
+      icon: <IconCoffee className="h-full w-full text-[#B07B50]" />,
+      href: "/studenthome/java",
+    },
+    {
+      title: "Java IDE",
+      icon: <IconCode className="h-full w-full text-[#B07B50]" />,
+      href: "/studenthome/java/ide",
+    },
+  ];
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#242526] flex items-center justify-center">
+      <div className="min-h-screen bg-neutral-950 flex items-center justify-center">
         <div className="text-center">
-          <IconCoffee className="h-12 w-12 mx-auto text-blue-600 animate-pulse" />
-          <p className="mt-2 text-gray-600">Loading your projects...</p>
+          <IconCoffee className="h-12 w-12 mx-auto text-[#6A4028] animate-pulse" />
+          <p className="mt-2 text-gray-400">Loading your projects...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#242526] p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Java Project Hub</h1>
-          <p className="text-gray-300">Manage your Java projects and get started with templates</p>
-        </div>
+    <>
+      {/* Remove this line to get rid of the floating nav bar: */}
+      {/* <FloatingNav className="z-50" /> */}
+      
+      <div className="pt-32 px-4 min-h-screen bg-neutral-950 text-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="relative mb-12">
+            <BackgroundLines className="opacity-10 absolute inset-0">
+              <div className="absolute inset-0" />
+            </BackgroundLines>
 
-        {/* Quick Actions */}
-        <div className="mb-8 flex gap-4">
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 bg-[#467061] hover:bg-[#3a5c52] text-white font-bold py-3 px-6 rounded-lg transition-colors"
-          >
-            <IconPlus className="h-5 w-5" />
-            Create New Project
-          </button>
-        </div>
+            <div className="text-center relative z-10">
+              <h1 className="text-4xl md:text-6xl lg:text-7xl bg-clip-text text-transparent bg-gradient-to-b from-[#D2B48C] via-[#8B5E3C] to-[#4B3621] font-bold mb-4">
+                Project Manager
+              </h1>
+              <p className="text-neutral-400 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-8">
+                Create, manage, and organize your Java projects
+              </p>
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Your Projects */}
-          <div className="lg:col-span-2">
-            <div className="bg-[#2f3031] rounded-lg shadow-sm border border-gray-600">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex items-center gap-2">
-                  <IconFolder className="h-6 w-6 text-[#467061]" />
-                  <h2 className="text-xl font-semibold text-white">Your Projects</h2>
-                  <span className="bg-gray-700 text-gray-200 px-2 py-1 rounded-full text-sm">
-                    {projects.length}/10
-                  </span>
+              <div className="flex justify-center mb-12">
+                <div className="flex space-x-4 p-4 bg-neutral-900/80 backdrop-blur-xl rounded-2xl border border-neutral-700/40 shadow-2xl">
+                  {dockLinks.map((link, index) => (
+                    <div key={index} className="relative group">
+                      <a
+                        href={link.href}
+                        className="flex items-center justify-center w-14 h-14 bg-neutral-800/70 backdrop-blur-sm hover:bg-neutral-700/90 rounded-xl transition-all duration-300 hover:scale-110 hover:rotate-2 border border-neutral-600/50 shadow-lg hover:shadow-xl hover:shadow-[#8B5E3C]/25"
+                      >
+                        {React.cloneElement(link.icon, {
+                          className: "h-6 w-6 text-[#B07B50] group-hover:text-[#CFAF91] transition-colors duration-200"
+                        })}
+                      </a>
+
+                      <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-neutral-900/95 backdrop-blur-md text-white px-3 py-1 rounded-lg text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-300 pointer-events-none border border-neutral-600/50 shadow-xl">
+                        {link.title}
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-900/95"></div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-              
-              <div className="p-6">
-                {projects.length === 0 ? (
-                  <div className="text-center py-12">
-                    <IconCode className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-                    <h3 className="text-lg font-medium text-white mb-2">No projects yet</h3>
-                    <p className="text-gray-300 mb-4">Create your first Java project to get started</p>
-                    <button
-                      onClick={() => setShowCreateModal(true)}
-                      className="bg-[#467061] hover:bg-[#3a5c52] text-white px-4 py-2 rounded-lg transition-colors"
-                    >
-                      Create Project
-                    </button>
+            </div>
+          </div>
+
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Your Projects */}
+            <div className="lg:col-span-2">
+              <div className="bg-neutral-800/60 rounded-lg shadow-sm border border-neutral-700 backdrop-blur-sm">
+                <div className="p-6 border-b border-neutral-700">
+                  <div className="flex items-center gap-2">
+                    <IconFolder className="h-6 w-6 text-[#B07B50]" />
+                    <h2 className="text-xl font-semibold text-white">Your Projects</h2>
+                    <span className="bg-neutral-700 text-neutral-200 px-2 py-1 rounded-full text-sm">
+                      {projects.length}/10
+                    </span>
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    {projects.slice(0, 10).map((project) => (
-                      <div
-                        key={project.id}
-                        className="flex items-center justify-between p-4 border border-gray-600 rounded-lg hover:bg-gray-700 transition-colors"
+                </div>
+                
+                <div className="p-6">
+                  {projects.length === 0 ? (
+                    <div className="text-center py-12">
+                      <IconCode className="h-16 w-16 mx-auto text-neutral-400 mb-4" />
+                      <h3 className="text-lg font-medium text-white mb-2">No projects yet</h3>
+                      <p className="text-neutral-400 mb-4">Create your first Java project to get started</p>
+                      <button
+                        onClick={() => setShowCreateModal(true)}
+                        className="bg-[#9c6f44] hover:bg-[#4B2C1A] text-white px-4 py-2 rounded-lg transition-colors duration-300 hover:scale-105"
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-[#467061] bg-opacity-20 rounded-lg">
-                            <IconCoffee className="h-5 w-5 text-[#467061]" />
+                        Create Project
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {projects.slice(0, 10).map((project) => (
+                        <div
+                          key={project.id}
+                          className="flex items-center justify-between p-4 border border-neutral-700 rounded-lg hover:bg-neutral-700/60 transition-all duration-300 group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-[#6A4028]/20 rounded-lg group-hover:bg-[#6A4028]/30 transition-colors">
+                              <IconCoffee className="h-5 w-5 text-[#B07B50]" />
+                            </div>
+                            <div>
+                              <h3 className="font-medium text-white">{project.name}</h3>
+                              <p className="text-sm text-neutral-400">
+                                Modified {formatDate(project.lastModified)}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <h3 className="font-medium text-white">{project.name}</h3>
-                            <p className="text-sm text-gray-400">
-                              Modified {formatDate(project.lastModified)}
-                            </p>
+                          
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => openIDE(project)}
+                              className="flex items-center gap-1 bg-[#6A4028] hover:bg-[#4B2C1A] text-white px-3 py-1.5 rounded text-sm transition-all duration-300 hover:scale-105"
+                            >
+                              <IconExternalLink className="h-4 w-4" />
+                              Open IDE
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeProject(project.id);
+                              }}
+                              className="p-1.5 text-red-400 hover:bg-red-400/10 rounded transition-colors duration-300 hover:scale-105">
+                                  <IconTrash className="h-4 w-4" />
+                            </button>
                           </div>
                         </div>
-                        
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => openIDE(project)}
-                            className="flex items-center gap-1 bg-[#467061] hover:bg-[#3a5c52] text-white px-3 py-1.5 rounded text-sm transition-colors"
-                          >
-                            <IconExternalLink className="h-4 w-4" />
-                            Open IDE
-                          </button>
-                          <button
-                            onClick={(e) => {
-                                e.stopPropagation(); // Prevent any parent click handlers
-                                removeProject(project.id);
-                            }}
-                            className="p-1.5 text-red-400 hover:bg-red-900 hover:bg-opacity-20 rounded transition-colors">
-                                <IconTrash className="h-4 w-4" />
-                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Template Projects */}
+              <div className="bg-neutral-800/60 rounded-lg shadow-sm border border-neutral-700 backdrop-blur-sm">
+                <div className="p-4 border-b border-neutral-700">
+                  <div className="flex items-center gap-2">
+                    <IconTemplate className="h-5 w-5 text-[#B07B50]" />
+                    <h3 className="font-semibold text-white">Templates</h3>
+                  </div>
+                </div>
+                
+                <div className="p-4 space-y-3">
+                  {templateProjects.map((template) => (
+                    <div
+                      key={template.id}
+                      className="border border-neutral-700 rounded-lg p-3 hover:bg-neutral-700/60 transition-all duration-300 cursor-pointer group"
+                      onClick={() => createFromTemplate(template)}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-white text-sm">{template.name}</h4>
+                          <p className="text-xs text-neutral-400 mt-1">{template.description}</p>
                         </div>
+                        <IconPlus className="h-4 w-4 text-neutral-400 flex-shrink-0 mt-0.5 group-hover:text-[#B07B50] transition-colors" />
                       </div>
-                    ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Your Classes */}
+              <div className="bg-neutral-800/60 rounded-lg shadow-sm border border-neutral-700 backdrop-blur-sm">
+                <div className="p-4 border-b border-neutral-700">
+                  <div className="flex items-center gap-2">
+                    <IconSchool className="h-5 w-5 text-[#B07B50]" />
+                    <h3 className="font-semibold text-white">Your Classes</h3>
+                  </div>
+                </div>
+                
+                <div className="p-4 space-y-3">
+                  {mockClasses.map((classItem) => (
+                    <div key={classItem.id} className="border border-neutral-700 rounded-lg p-3 hover:bg-neutral-700/60 transition-colors">
+                      <h4 className="font-medium text-white text-sm">{classItem.code}</h4>
+                      <p className="text-xs text-neutral-300 mt-1">{classItem.name}</p>
+                      <p className="text-xs text-neutral-400">{classItem.instructor}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Create Project Modal */}
+          {showCreateModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-neutral-800 rounded-lg max-w-md w-full p-6 border border-neutral-700 backdrop-blur-sm">
+                <h3 className="text-lg font-semibold text-white mb-4">
+                  {selectedTemplate ? `Create from ${selectedTemplate.name}` : 'Create New Project'}
+                </h3>
+                
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-neutral-200 mb-2">
+                    Project Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    placeholder="Enter project name"
+                    className="w-full px-3 py-2 bg-neutral-700/50 text-white border border-neutral-600 rounded-lg focus:ring-2 focus:ring-[#8B5E3C] focus:border-transparent transition-colors"
+                    autoFocus
+                  />
+                </div>
+
+                {selectedTemplate && (
+                  <div className="mb-4 p-3 bg-[#8B5E3C]/20 border border-[#8B5E3C]/30 rounded-lg">
+                    <p className="text-sm text-[#CFAF91]">
+                      <strong>Template:</strong> {selectedTemplate.description}
+                    </p>
                   </div>
                 )}
-              </div>
-            </div>
-          </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Template Projects */}
-            <div className="bg-[#2f3031] rounded-lg shadow-sm border border-gray-600">
-              <div className="p-4 border-b border-gray-200">
-                <div className="flex items-center gap-2">
-                  <IconTemplate className="h-5 w-5 text-[#467061]" />
-                  <h3 className="font-semibold text-white">Templates</h3>
-                </div>
-              </div>
-              
-              <div className="p-4 space-y-3">
-                {templateProjects.map((template) => (
-                  <div
-                    key={template.id}
-                    className="border border-gray-600 rounded-lg p-3 hover:bg-gray-700 transition-colors cursor-pointer"
-                    onClick={() => createFromTemplate(template)}
+                <div className="flex gap-3 justify-end">
+                  <button
+                    onClick={() => {
+                      setShowCreateModal(false);
+                      setNewProjectName('');
+                      setSelectedTemplate(null);
+                    }}
+                    className="px-4 py-2 text-neutral-400 hover:text-neutral-200 transition-colors"
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-white text-sm">{template.name}</h4>
-                        <p className="text-xs text-gray-400 mt-1">{template.description}</p>
-                      </div>
-                      <IconPlus className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Your Classes */}
-            <div className="bg-[#2f3031] rounded-lg shadow-sm border border-gray-600">
-              <div className="p-4 border-b border-gray-200">
-                <div className="flex items-center gap-2">
-                  <IconSchool className="h-5 w-5 text-[#467061]" />
-                  <h3 className="font-semibold text-white">Your Classes</h3>
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => createProject(selectedTemplate)}
+                    disabled={!newProjectName.trim()}
+                    className="px-4 py-2 bg-[#6A4028] hover:bg-[#4B2C1A] disabled:bg-neutral-600 text-white rounded-lg transition-all duration-300 hover:scale-105"
+                  >
+                    Create Project
+                  </button>
                 </div>
               </div>
-              
-              <div className="p-4 space-y-3">
-                {mockClasses.map((classItem) => (
-                  <div key={classItem.id} className="border border-gray-600 rounded-lg p-3">
-                    <h4 className="font-medium text-white text-sm">{classItem.code}</h4>
-                    <p className="text-xs text-gray-300 mt-1">{classItem.name}</p>
-                    <p className="text-xs text-gray-400">{classItem.instructor}</p>
-                  </div>
-                ))}
-              </div>
             </div>
-          </div>
+          )}
         </div>
-
-        {/* Create Project Modal */}
-        {showCreateModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-[#2f3031] rounded-lg max-w-md w-full p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">
-                {selectedTemplate ? `Create from ${selectedTemplate.name}` : 'Create New Project'}
-              </h3>
-              
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-200 mb-2">
-                  Project Name
-                </label>
-                <input
-                  type="text"
-                  value={newProjectName}
-                  onChange={(e) => setNewProjectName(e.target.value)}
-                  placeholder="Enter project name"
-                  className="w-full px-3 py-2 bg-[#242526] text-white border border-gray-600 rounded-lg focus:ring-2 focus:ring-[#467061] focus:border-transparent"
-                  autoFocus
-                />
-              </div>
-
-              {selectedTemplate && (
-                <div className="mb-4 p-3 bg-[#467061] bg-opacity-20 border border-[#467061] rounded-lg">
-                  <p className="text-sm text-[#467061]">
-                    <strong>Template:</strong> {selectedTemplate.description}
-                  </p>
-                </div>
-              )}
-
-              <div className="flex gap-3 justify-end">
-                <button
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    setNewProjectName('');
-                    setSelectedTemplate(null);
-                  }}
-                  className="px-4 py-2 text-gray-400 hover:text-gray-200 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => createProject(selectedTemplate)}
-                  disabled={!newProjectName.trim()}
-                  className="px-4 py-2 bg-[#467061] hover:bg-[#3a5c52] disabled:bg-gray-600 text-white rounded-lg transition-colors"
-                >
-                  Create Project
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
-    </div>
+
+      <style jsx global>{`
+        /* Disable scrolling */
+        html, body {
+          overflow: hidden !important;
+          height: 100vh !important;
+        }
+
+        .bento-grid-item {
+          overflow: hidden !important;
+          border-radius: 1rem !important;
+          contain: layout style paint;
+        }
+
+        .bento-grid-item > div {
+          height: 100% !important;
+          overflow: hidden !important;
+          box-sizing: border-box;
+        }
+
+        .bento-scroll-container {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(59, 130, 246, 0.3) transparent;
+          scroll-behavior: smooth;
+        }
+
+        .bento-scroll-container::-webkit-scrollbar {
+          width: 4px;
+        }
+
+        .bento-scroll-container::-webkit-scrollbar-track {
+          background: transparent;
+          border-radius: 2px;
+        }
+
+        .bento-scroll-container::-webkit-scrollbar-thumb {
+          background: rgba(59, 130, 246, 0.3);
+          border-radius: 2px;
+          transition: background-color 0.2s ease;
+        }
+
+        .bento-scroll-container::-webkit-scrollbar-thumb:hover {
+          background: rgba(59, 130, 246, 0.5);
+        }
+
+        .bento-scroll-container {
+          overscroll-behavior: contain;
+        }
+
+        html {
+          scroll-behavior: smooth;
+        }
+
+        ::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+          background: rgba(0, 0, 0, 0.1);
+          border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+          background: rgba(59, 130, 246, 0.5);
+          border-radius: 3px;
+          transition: background-color 0.2s ease;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+          background: rgba(59, 130, 246, 0.7);
+        }
+
+        .truncate {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .scrollbar-thin {
+          scrollbar-width: thin;
+        }
+
+        .scrollbar-track-transparent {
+          scrollbar-color: transparent transparent;
+        }
+
+        .scrollbar-thumb-[#8B5E3C] {
+          scrollbar-color: rgba(59, 130, 246, 0.3) transparent;
+        }
+
+        .scrollbar-thumb-rounded-full {
+        }
+      `}</style>
+    </>
   );
 }
