@@ -21,22 +21,6 @@ import {
 // import { FloatingNav } from "@/app/components/ui/floating-navbar";
 import { BackgroundLines } from "@/app/components/ui/background-lines";
 
-const GradientMeshBackground = ({ className = "" }) => (
-  <div className={`absolute inset-0 ${className}`}>
-    <div 
-      className="absolute inset-0 opacity-40"
-      style={{
-        background: `
-          radial-gradient(circle at 20% 80%, rgba(34, 197, 94, 0.1) 0%, transparent 50%),
-          radial-gradient(circle at 80% 20%, rgba(34, 197, 94, 0.08) 0%, transparent 50%),
-          radial-gradient(circle at 40% 40%, rgba(34, 197, 94, 0.05) 0%, transparent 50%),
-          linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%)
-        `
-      }}
-    />
-  </div>
-);
-
 // IndexedDB helper functions
 const DB_NAME = 'PythonProjectsDB';
 const DB_VERSION = 1;
@@ -95,16 +79,16 @@ const templateProjects = [
   {
     id: 'template-hello-world',
     name: 'Hello World',
-    description: 'Basic Python application with main method',
+    description: 'Basic Python application with print statement',
     template: true,
     files: [
       {
-        filename: 'Main.python',
-        contents: `public class Main {
-    public static void main(String[] args) {
-        System.out.println("Hello, World!");
-    }
-}`
+        filename: 'main.py',
+        contents: `def main():
+    print("Hello, World!")
+
+if __name__ == "__main__":
+    main()`
       }
     ]
   },
@@ -115,51 +99,36 @@ const templateProjects = [
     template: true,
     files: [
       {
-        filename: 'Calculator.python',
-        contents: `import python.util.Scanner;
+        filename: 'calculator.py',
+        contents: `def calculator():
+    try:
+        num1 = float(input("Enter first number: "))
+        operator = input("Enter operator (+, -, *, /): ")
+        num2 = float(input("Enter second number: "))
+        
+        if operator == '+':
+            result = num1 + num2
+        elif operator == '-':
+            result = num1 - num2
+        elif operator == '*':
+            result = num1 * num2
+        elif operator == '/':
+            if num2 != 0:
+                result = num1 / num2
+            else:
+                print("Error: Division by zero!")
+                return
+        else:
+            print("Invalid operator!")
+            return
+        
+        print(f"Result: {result}")
+        
+    except ValueError:
+        print("Error: Please enter valid numbers!")
 
-public class Calculator {
-    public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
-        
-        System.out.print("Enter first number: ");
-        double num1 = scanner.nextDouble();
-        
-        System.out.print("Enter operator (+, -, *, /): ");
-        char operator = scanner.next().charAt(0);
-        
-        System.out.print("Enter second number: ");
-        double num2 = scanner.nextDouble();
-        
-        double result = 0;
-        
-        switch(operator) {
-            case '+':
-                result = num1 + num2;
-                break;
-            case '-':
-                result = num1 - num2;
-                break;
-            case '*':
-                result = num1 * num2;
-                break;
-            case '/':
-                if(num2 != 0) {
-                    result = num1 / num2;
-                } else {
-                    System.out.println("Error: Division by zero!");
-                    return;
-                }
-                break;
-            default:
-                System.out.println("Invalid operator!");
-                return;
-        }
-        
-        System.out.println("Result: " + result);
-        scanner.close();
-    }
-}`
+if __name__ == "__main__":
+    calculator()`
       }
     ]
   },
@@ -170,59 +139,49 @@ public class Calculator {
     template: true,
     files: [
       {
-        filename: 'Student.python',
-        contents: `public class Student {
-    private String name;
-    private int age;
-    private String studentId;
+        filename: 'student.py',
+        contents: `class Student:
+    def __init__(self, name, age, student_id):
+        self.name = name
+        self.age = age
+        self.student_id = student_id
     
-    public Student(String name, int age, String studentId) {
-        this.name = name;
-        this.age = age;
-        this.studentId = studentId;
-    }
+    def get_name(self):
+        return self.name
     
-    public String getName() {
-        return name;
-    }
+    def set_name(self, name):
+        self.name = name
     
-    public void setName(String name) {
-        this.name = name;
-    }
+    def get_age(self):
+        return self.age
     
-    public int getAge() {
-        return age;
-    }
+    def set_age(self, age):
+        self.age = age
     
-    public void setAge(int age) {
-        this.age = age;
-    }
+    def get_student_id(self):
+        return self.student_id
     
-    public String getStudentId() {
-        return studentId;
-    }
-    
-    public void displayInfo() {
-        System.out.println("Name: " + name);
-        System.out.println("Age: " + age);
-        System.out.println("Student ID: " + studentId);
-    }
-}`
+    def display_info(self):
+        print(f"Name: {self.name}")
+        print(f"Age: {self.age}")
+        print(f"Student ID: {self.student_id}")`
       },
       {
-        filename: 'Main.python',
-        contents: `public class Main {
-    public static void main(String[] args) {
-        Student student1 = new Student("John Doe", 20, "ST001");
-        Student student2 = new Student("Jane Smith", 19, "ST002");
-        
-        System.out.println("Student 1 Information:");
-        student1.displayInfo();
-        
-        System.out.println("\\nStudent 2 Information:");
-        student2.displayInfo();
-    }
-}`
+        filename: 'main.py',
+        contents: `from student import Student
+
+def main():
+    student1 = Student("John Doe", 20, "ST001")
+    student2 = Student("Jane Smith", 19, "ST002")
+    
+    print("Student 1 Information:")
+    student1.display_info()
+    
+    print("\\nStudent 2 Information:")
+    student2.display_info()
+
+if __name__ == "__main__":
+    main()`
       }
     ]
   }
@@ -266,12 +225,12 @@ export default function ProjectManager() {
       lastModified: new Date().toISOString(),
       files: template ? template.files : [
         {
-          filename: 'Main.python',
-          contents: `public class Main {
-    public static void main(String[] args) {
-        System.out.println("Hello, World!");
-    }
-}`
+          filename: 'main.py',
+          contents: `def main():
+    print("Hello, World!")
+
+if __name__ == "__main__":
+    main()`
         }
       ]
     };
@@ -341,17 +300,17 @@ export default function ProjectManager() {
 const dockLinks = [
     {
       title: "Back Home",
-      icon: <IconHome className="h-full w-full text-emerald-400" />,
+      icon: <IconHome className="h-full w-full text-[#4F7942]" />,
       href: "/studenthome",
     },
     {
       title: "Python Dashboard",
-      icon: <IconBrandPython className="h-full w-full text-green-400" />,
+      icon: <IconBrandPython className="h-full w-full text-[#4F7942]" />,
       href: "/studenthome/python",
     },
     {
       title: "Python IDE",
-      icon: <IconCode className="h-full w-full text-green-400" />,
+      icon: <IconCode className="h-full w-full text-[#4F7942]" />,
       href: "/studenthome/python/ide",
     },
   ];
@@ -360,7 +319,7 @@ const dockLinks = [
     return (
       <div className="min-h-screen bg-neutral-950 flex items-center justify-center">
         <div className="text-center">
-          <IconBrandPython className="h-12 w-12 mx-auto text-green-600 animate-pulse" />
+          <IconBrandPython className="h-12 w-12 mx-auto text-[#306844] animate-pulse" />
           <p className="mt-2 text-gray-400">Loading your projects...</p>
         </div>
       </div>
@@ -380,7 +339,7 @@ const dockLinks = [
             </BackgroundLines>
 
             <div className="text-center relative z-10">
-              <h1 className="text-4xl md:text-6xl lg:text-7xl bg-clip-text text-transparent bg-gradient-to-b from-[#D2B48C] via-green-500 to-green-700 font-bold mb-4">
+              <h1 className="text-4xl md:text-6xl lg:text-7xl bg-clip-text text-transparent bg-gradient-to-b from-[#90EE90] via-[#228B22] to-[#006400] font-bold mb-4">
                 Project Manager
               </h1>
               <p className="text-neutral-400 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-8">
@@ -393,10 +352,10 @@ const dockLinks = [
                     <div key={index} className="relative group">
                       <a
                         href={link.href}
-                        className="flex items-center justify-center w-14 h-14 bg-neutral-800/70 backdrop-blur-sm hover:bg-neutral-700/90 rounded-xl transition-all duration-300 hover:scale-110 hover:rotate-2 border border-neutral-600/50 shadow-lg hover:shadow-xl hover:shadow-green-500/25"
+                        className="flex items-center justify-center w-14 h-14 bg-neutral-800/70 backdrop-blur-sm hover:bg-neutral-700/90 rounded-xl transition-all duration-300 hover:scale-110 hover:rotate-2 border border-neutral-600/50 shadow-lg hover:shadow-xl hover:shadow-[#228B22]/25"
                       >
                         {React.cloneElement(link.icon, {
-                          className: "h-6 w-6 text-green-400 group-hover:text-green-300 transition-colors duration-200"
+                          className: "h-6 w-6 text-[#4F7942] group-hover:text-[#90EE90] transition-colors duration-200"
                         })}
                       </a>
 
@@ -419,7 +378,7 @@ const dockLinks = [
                 <div className="p-6 border-b border-neutral-700">
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-2">
-                      <IconFolder className="h-6 w-6 text-green-400" />
+                      <IconFolder className="h-6 w-6 text-[#4F7942]" />
                       <h2 className="text-xl font-semibold text-white">Your Projects</h2>
                       <span className="bg-neutral-700 text-neutral-200 px-2 py-1 rounded-full text-sm">
                         {projects.length}/10
@@ -428,7 +387,7 @@ const dockLinks = [
                     {projects.length > 0 && (
                       <button
                         onClick={() => setShowCreateModal(true)}
-                        className="flex items-center gap-1 bggreen-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-sm transition-all duration-300 hover:scale-105 group"
+                        className="flex items-center gap-1 bg-[#306844] hover:bg-[#1a3a24] text-white px-3 py-1.5 rounded-lg text-sm transition-all duration-300 hover:scale-105 group"
                       >
                         <IconPlus className="h-4 w-4 group-hover:rotate-90 transition-transform duration-300" />
                         New Project
@@ -440,12 +399,12 @@ const dockLinks = [
                 <div className="p-6">
                   {projects.length === 0 ? (
                     <div className="text-center py-12">
-                      <IconCode className="h-16 w-16 mx-auto text-green-700 mb-4" />
-                      <h3 className="text-lg font-medium text- mb-2">No projects yet</h3>
+                      <IconCode className="h-16 w-16 mx-auto text-neutral-400 mb-4" />
+                      <h3 className="text-lg font-medium text-white mb-2">No projects yet</h3>
                       <p className="text-neutral-400 mb-4">Create your first Python project to get started</p>
                       <button
                         onClick={() => setShowCreateModal(true)}
-                        className="bg-green-800 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-300 hover:scale-105"
+                        className="bg-[#4F7942] hover:bg-[#1a3a24] text-white px-4 py-2 rounded-lg transition-colors duration-300 hover:scale-105"
                       >
                         Create Project
                       </button>
@@ -458,8 +417,8 @@ const dockLinks = [
                           className="flex items-center justify-between p-4 border border-neutral-700 rounded-lg hover:bg-neutral-700/60 transition-all duration-300 group"
                         >
                           <div className="flex items-center gap-3">
-                            <div className="p-2 bggreen-600/20 rounded-lg group-hover:bggreen-600/30 transition-colors">
-                              <IconBrandPython className="h-5 w-5 text-green-400" />
+                            <div className="p-2 bg-[#306844]/20 rounded-lg group-hover:bg-[#306844]/30 transition-colors">
+                              <IconBrandPython className="h-5 w-5 text-[#4F7942]" />
                             </div>
                             <div>
                               <h3 className="font-medium text-white">{project.name}</h3>
@@ -472,7 +431,7 @@ const dockLinks = [
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => openIDE(project)}
-                              className="flex items-center gap-1 bggreen-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm transition-all duration-300 hover:scale-105"
+                              className="flex items-center gap-1 bg-[#306844] hover:bg-[#1a3a24] text-white px-3 py-1.5 rounded text-sm transition-all duration-300 hover:scale-105"
                             >
                               <IconExternalLink className="h-4 w-4" />
                               Open IDE
@@ -500,7 +459,7 @@ const dockLinks = [
               <div className="bg-neutral-800/60 rounded-lg shadow-sm border border-neutral-700 backdrop-blur-sm">
                 <div className="p-4 border-b border-neutral-700">
                   <div className="flex items-center gap-2">
-                    <IconTemplate className="h-5 w-5 text-green-400" />
+                    <IconTemplate className="h-5 w-5 text-[#4F7942]" />
                     <h3 className="font-semibold text-white">Templates</h3>
                   </div>
                 </div>
@@ -517,7 +476,7 @@ const dockLinks = [
                           <h4 className="font-medium text-white text-sm">{template.name}</h4>
                           <p className="text-xs text-neutral-400 mt-1">{template.description}</p>
                         </div>
-                        <IconPlus className="h-4 w-4 text-neutral-400 flex-shrink-0 mt-0.5 group-hover:text-green-400 transition-colors" />
+                        <IconPlus className="h-4 w-4 text-neutral-400 flex-shrink-0 mt-0.5 group-hover:text-[#4F7942] transition-colors" />
                       </div>
                     </div>
                   ))}
@@ -528,7 +487,7 @@ const dockLinks = [
               <div className="bg-neutral-800/60 rounded-lg shadow-sm border border-neutral-700 backdrop-blur-sm">
                 <div className="p-4 border-b border-neutral-700">
                   <div className="flex items-center gap-2">
-                    <IconSchool className="h-5 w-5 text-green-400" />
+                    <IconSchool className="h-5 w-5 text-[#4F7942]" />
                     <h3 className="font-semibold text-white">Your Classes</h3>
                   </div>
                 </div>
@@ -563,14 +522,14 @@ const dockLinks = [
                     value={newProjectName}
                     onChange={(e) => setNewProjectName(e.target.value)}
                     placeholder="Enter project name"
-                    className="w-full px-3 py-2 bg-neutral-700/50 text-white border border-neutral-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-colors"
+                    className="w-full px-3 py-2 bg-neutral-700/50 text-white border border-neutral-600 rounded-lg focus:ring-2 focus:ring-[#228B22] focus:border-transparent transition-colors"
                     autoFocus
                   />
                 </div>
 
                 {selectedTemplate && (
-                  <div className="mb-4 p-3 bg-green-500/20 border border-green-500/30 rounded-lg">
-                    <p className="text-sm text-green-300">
+                  <div className="mb-4 p-3 bg-[#228B22]/20 border border-[#228B22]/30 rounded-lg">
+                    <p className="text-sm text-[#90EE90]">
                       <strong>Template:</strong> {selectedTemplate.description}
                     </p>
                   </div>
@@ -590,7 +549,7 @@ const dockLinks = [
                   <button
                     onClick={() => createProject(selectedTemplate)}
                     disabled={!newProjectName.trim()}
-                    className="px-4 py-2 bggreen-600 hover:bg-green-700 disabled:bg-neutral-600 text-white rounded-lg transition-all duration-300 hover:scale-105"
+                    className="px-4 py-2 bg-[#306844] hover:bg-[#1a3a24] disabled:bg-neutral-600 text-white rounded-lg transition-all duration-300 hover:scale-105"
                   >
                     Create Project
                   </button>
@@ -622,7 +581,7 @@ const dockLinks = [
 
         .bento-scroll-container {
           scrollbar-width: thin;
-          scrollbar-color: rgba(59, 130, 246, 0.3) transparent;
+          scrollbar-color: rgba(34, 139, 34, 0.3) transparent;
           scroll-behavior: smooth;
         }
 
@@ -636,13 +595,13 @@ const dockLinks = [
         }
 
         .bento-scroll-container::-webkit-scrollbar-thumb {
-          background: rgba(59, 130, 246, 0.3);
+          background: rgba(34, 139, 34, 0.3);
           border-radius: 2px;
           transition: background-color 0.2s ease;
         }
 
         .bento-scroll-container::-webkit-scrollbar-thumb:hover {
-          background: rgba(59, 130, 246, 0.5);
+          background: rgba(34, 139, 34, 0.5);
         }
 
         .bento-scroll-container {
@@ -663,13 +622,13 @@ const dockLinks = [
         }
 
         ::-webkit-scrollbar-thumb {
-          background: rgba(59, 130, 246, 0.5);
+          background: rgba(34, 139, 34, 0.5);
           border-radius: 3px;
           transition: background-color 0.2s ease;
         }
 
         ::-webkit-scrollbar-thumb:hover {
-          background: rgba(59, 130, 246, 0.7);
+          background: rgba(34, 139, 34, 0.7);
         }
 
         .truncate {
@@ -686,8 +645,8 @@ const dockLinks = [
           scrollbar-color: transparent transparent;
         }
 
-        .scrollbar-thumb-green-500 {
-          scrollbar-color: rgba(59, 130, 246, 0.3) transparent;
+        .scrollbar-thumb-[#228B22] {
+          scrollbar-color: rgba(34, 139, 34, 0.3) transparent;
         }
 
         .scrollbar-thumb-rounded-full {

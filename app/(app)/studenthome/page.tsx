@@ -83,26 +83,18 @@ export default function Page() {
             href: "/studenthome/java",
         },
         {
-            title: "Node.js",
-            icon: (
-                <IconFileTypeJs className="h-full w-full text-neutral-500 dark:text-neutral-300" />
-            ),
-            href: "/studenthome/linux",
-        },
-
-        {
             title: "Python",
             icon: (
                 <IconBrandPython className="h-full w-full text-neutral-500 dark:text-neutral-300" />
             ),
-            href: "/studenthome/linux",
+            href: "/studenthome/python",
         },
         {
             title: "C++",
             icon: (
                 <IconBrandCpp className="h-full w-full text-neutral-500 dark:text-neutral-300" />
             ),
-            href: "/studenthome/linux?prog=gcc",
+            href: "/studenthome/cpp",
         },
         {
             title: "Linux Terminal",

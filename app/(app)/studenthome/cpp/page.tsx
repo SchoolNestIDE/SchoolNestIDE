@@ -9,7 +9,7 @@ import {
   IconTrash, 
   IconEdit, 
   IconExternalLink,
-  IconCoffee,
+  IconBrandCpp,
   IconCode,
   IconFile,
   IconHome,
@@ -21,8 +21,24 @@ import {
 // import { FloatingNav } from "@/app/components/ui/floating-navbar";
 import { BackgroundLines } from "@/app/components/ui/background-lines";
 
+const GradientMeshBackground = ({ className = "" }) => (
+  <div className={`absolute inset-0 ${className}`}>
+    <div 
+      className="absolute inset-0 opacity-40"
+      style={{
+        background: `
+          radial-gradient(circle at 20% 80%, rgba(34, 197, 94, 0.1) 0%, transparent 50%),
+          radial-gradient(circle at 80% 20%, rgba(34, 197, 94, 0.08) 0%, transparent 50%),
+          radial-gradient(circle at 40% 40%, rgba(34, 197, 94, 0.05) 0%, transparent 50%),
+          linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%)
+        `
+      }}
+    />
+  </div>
+);
+
 // IndexedDB helper functions
-const DB_NAME = 'JavaProjectsDB';
+const DB_NAME = 'CPPProjectsDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'projects';
 //@ts-ignore
@@ -79,11 +95,11 @@ const templateProjects = [
   {
     id: 'template-hello-world',
     name: 'Hello World',
-    description: 'Basic Java application with main method',
+    description: 'Basic Python application with main method',
     template: true,
     files: [
       {
-        filename: 'Main.java',
+        filename: 'Main.python',
         contents: `public class Main {
     public static void main(String[] args) {
         System.out.println("Hello, World!");
@@ -99,8 +115,8 @@ const templateProjects = [
     template: true,
     files: [
       {
-        filename: 'Calculator.java',
-        contents: `import java.util.Scanner;
+        filename: 'Calculator.python',
+        contents: `import python.util.Scanner;
 
 public class Calculator {
     public static void main(String[] args) {
@@ -154,7 +170,7 @@ public class Calculator {
     template: true,
     files: [
       {
-        filename: 'Student.java',
+        filename: 'Student.python',
         contents: `public class Student {
     private String name;
     private int age;
@@ -194,7 +210,7 @@ public class Calculator {
 }`
       },
       {
-        filename: 'Main.java',
+        filename: 'Main.python',
         contents: `public class Main {
     public static void main(String[] args) {
         Student student1 = new Student("John Doe", 20, "ST001");
@@ -250,12 +266,8 @@ export default function ProjectManager() {
       lastModified: new Date().toISOString(),
       files: template ? template.files : [
         {
-          filename: 'Main.java',
-          contents: `public class Main {
-    public static void main(String[] args) {
-        System.out.println("Hello, World!");
-    }
-}`
+          filename: 'main.cpp',
+          contents: ``
         }
       ]
     };
@@ -310,7 +322,7 @@ export default function ProjectManager() {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
 
-  window.open(`/studenthome/java/ide?project=${urlSafeName}`, '_blank');
+  window.open(`/studenthome/cpp/ide?project=${urlSafeName}`, '_blank');
 };
 
   const formatDate = (dateString) => {
@@ -325,18 +337,18 @@ export default function ProjectManager() {
 const dockLinks = [
     {
       title: "Back Home",
-      icon: <IconHome className="h-full w-full text-[#B07B50]" />,
+      icon: <IconHome className="h-full w-full text-emerald-400" />,
       href: "/studenthome",
     },
     {
-      title: "Java Dashboard",
-      icon: <IconCoffee className="h-full w-full text-[#B07B50]" />,
-      href: "/studenthome/java",
+      title: "C++ Dashboard",
+      icon: <IconBrandCpp className="h-full w-full text-blue-400" />,
+      href: "/studenthome/cpp",
     },
     {
-      title: "Java IDE",
-      icon: <IconCode className="h-full w-full text-[#B07B50]" />,
-      href: "/studenthome/java/ide",
+      title: "C++ IDE",
+      icon: <IconCode className="h-full w-full text-blue-400" />,
+      href: "/studenthome/cpp/ide",
     },
   ];
 
@@ -344,7 +356,7 @@ const dockLinks = [
     return (
       <div className="min-h-screen bg-neutral-950 flex items-center justify-center">
         <div className="text-center">
-          <IconCoffee className="h-12 w-12 mx-auto text-[#6A4028] animate-pulse" />
+          <IconBrandCpp className="h-12 w-12 mx-auto text-blue-600 animate-pulse" />
           <p className="mt-2 text-gray-400">Loading your projects...</p>
         </div>
       </div>
@@ -358,29 +370,29 @@ const dockLinks = [
       
       <div className="pt-32 px-4 min-h-screen bg-neutral-950 text-white">
         <div className="max-w-7xl mx-auto">
-          <div className="relative mb-16"> {/* Increased margin from mb-12 to mb-16 */}
-  <BackgroundLines className="opacity-10 absolute inset-0">
-    <div className="absolute inset-0" />
-  </BackgroundLines>
+          <div className="relative mb-12">
+            <BackgroundLines className="opacity-10 absolute inset-0">
+              <div className="absolute inset-0" />
+            </BackgroundLines>
 
             <div className="text-center relative z-10">
-              <h1 className="text-4xl md:text-6xl lg:text-7xl bg-clip-text text-transparent bg-gradient-to-b from-[#D2B48C] via-[#8B5E3C] to-[#4B3621] font-bold mb-4 leading-tight"> {/* Added leading-tight and increased mb-4 to mb-6 */}
-                Java Project Manager
+              <h1 className="text-4xl md:text-6xl lg:text-7xl bg-clip-text text-transparent bg-gradient-to-b from-[#D2B48C] via-blue-500 to-blue-700 font-bold mb-4">
+                Project Manager
               </h1>
               <p className="text-neutral-400 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-8">
-                Create, manage, and organize your Java projects
+                Create, manage, and organize your C++ projects
               </p>
 
-              <div className="flex justify-center mb-12"> {/* Increased margin from mb-12 to mb-16 */}
+              <div className="flex justify-center mb-12">
                 <div className="flex space-x-4 p-4 bg-neutral-900/80 backdrop-blur-xl rounded-2xl border border-neutral-700/40 shadow-2xl">
                   {dockLinks.map((link, index) => (
                     <div key={index} className="relative group">
                       <a
                         href={link.href}
-                        className="flex items-center justify-center w-14 h-14 bg-neutral-800/70 backdrop-blur-sm hover:bg-neutral-700/90 rounded-xl transition-all duration-300 hover:scale-110 hover:rotate-2 border border-neutral-600/50 shadow-lg hover:shadow-xl hover:shadow-[#8B5E3C]/25"
+                        className="flex items-center justify-center w-14 h-14 bg-neutral-800/70 backdrop-blur-sm hover:bg-neutral-700/90 rounded-xl transition-all duration-300 hover:scale-110 hover:rotate-2 border border-neutral-600/50 shadow-lg hover:shadow-xl hover:shadow-blue-500/25"
                       >
                         {React.cloneElement(link.icon, {
-                          className: "h-6 w-6 text-[#B07B50] group-hover:text-[#CFAF91] transition-colors duration-200"
+                          className: "h-6 w-6 text-blue-400 group-hover:text-blue-300 transition-colors duration-200"
                         })}
                       </a>
 
@@ -403,7 +415,7 @@ const dockLinks = [
                 <div className="p-6 border-b border-neutral-700">
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-2">
-                      <IconFolder className="h-6 w-6 text-[#B07B50]" />
+                      <IconFolder className="h-6 w-6 text-blue-400" />
                       <h2 className="text-xl font-semibold text-white">Your Projects</h2>
                       <span className="bg-neutral-700 text-neutral-200 px-2 py-1 rounded-full text-sm">
                         {projects.length}/10
@@ -412,7 +424,7 @@ const dockLinks = [
                     {projects.length > 0 && (
                       <button
                         onClick={() => setShowCreateModal(true)}
-                        className="flex items-center gap-1 bg-[#6A4028] hover:bg-[#4B2C1A] text-white px-3 py-1.5 rounded-lg text-sm transition-all duration-300 hover:scale-105 group"
+                        className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm transition-all duration-300 hover:scale-105 group"
                       >
                         <IconPlus className="h-4 w-4 group-hover:rotate-90 transition-transform duration-300" />
                         New Project
@@ -420,16 +432,16 @@ const dockLinks = [
                     )}
                   </div>
                 </div>
-
+                
                 <div className="p-6">
                   {projects.length === 0 ? (
                     <div className="text-center py-12">
-                      <IconCode className="h-16 w-16 mx-auto text-neutral-400 mb-4" />
-                      <h3 className="text-lg font-medium text-white mb-2">No projects yet</h3>
-                      <p className="text-neutral-400 mb-4">Create your first Java project to get started</p>
+                      <IconCode className="h-16 w-16 mx-auto text-blue-700 mb-4" />
+                      <h3 className="text-lg font-medium text- mb-2">No projects yet</h3>
+                      <p className="text-neutral-400 mb-4">Create your first C++ project to get started</p>
                       <button
                         onClick={() => setShowCreateModal(true)}
-                        className="bg-[#9c6f44] hover:bg-[#4B2C1A] text-white px-4 py-2 rounded-lg transition-colors duration-300 hover:scale-105"
+                        className="bg-blue-800 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-300 hover:scale-105"
                       >
                         Create Project
                       </button>
@@ -442,8 +454,8 @@ const dockLinks = [
                           className="flex items-center justify-between p-4 border border-neutral-700 rounded-lg hover:bg-neutral-700/60 transition-all duration-300 group"
                         >
                           <div className="flex items-center gap-3">
-                            <div className="p-2 bg-[#6A4028]/20 rounded-lg group-hover:bg-[#6A4028]/30 transition-colors">
-                              <IconCoffee className="h-5 w-5 text-[#B07B50]" />
+                            <div className="p-2 bg-blue-600/20 rounded-lg group-hover:bg-blue-600/30 transition-colors">
+                              <IconBrandCpp className="h-5 w-5 text-blue-400" />
                             </div>
                             <div>
                               <h3 className="font-medium text-white">{project.name}</h3>
@@ -452,22 +464,22 @@ const dockLinks = [
                               </p>
                             </div>
                           </div>
-
+                          
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => openIDE(project)}
-                              className="flex items-center gap-1 bg-[#6A4028] hover:bg-[#4B2C1A] text-white px-3 py-1.5 rounded text-sm transition-all duration-300 hover:scale-105"
+                              className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm transition-all duration-300 hover:scale-105"
                             >
                               <IconExternalLink className="h-4 w-4" />
                               Open IDE
                             </button>
                             <button
                               onClick={(e) => {
-                                e.stopPropagation();
-                                removeProject(project.id);
+                                  e.stopPropagation();
+                                  removeProject(project.id);
                               }}
                               className="p-1.5 text-red-400 hover:bg-red-400/10 rounded transition-colors duration-300 hover:scale-105">
-                              <IconTrash className="h-4 w-4" />
+                                  <IconTrash className="h-4 w-4" />
                             </button>
                           </div>
                         </div>
@@ -484,11 +496,11 @@ const dockLinks = [
               <div className="bg-neutral-800/60 rounded-lg shadow-sm border border-neutral-700 backdrop-blur-sm">
                 <div className="p-4 border-b border-neutral-700">
                   <div className="flex items-center gap-2">
-                    <IconTemplate className="h-5 w-5 text-[#B07B50]" />
+                    <IconTemplate className="h-5 w-5 text-blue-400" />
                     <h3 className="font-semibold text-white">Templates</h3>
                   </div>
                 </div>
-
+                
                 <div className="p-4 space-y-3">
                   {templateProjects.map((template) => (
                     <div
@@ -501,7 +513,7 @@ const dockLinks = [
                           <h4 className="font-medium text-white text-sm">{template.name}</h4>
                           <p className="text-xs text-neutral-400 mt-1">{template.description}</p>
                         </div>
-                        <IconPlus className="h-4 w-4 text-neutral-400 flex-shrink-0 mt-0.5 group-hover:text-[#B07B50] transition-colors" />
+                        <IconPlus className="h-4 w-4 text-neutral-400 flex-shrink-0 mt-0.5 group-hover:text-blue-400 transition-colors" />
                       </div>
                     </div>
                   ))}
@@ -512,11 +524,11 @@ const dockLinks = [
               <div className="bg-neutral-800/60 rounded-lg shadow-sm border border-neutral-700 backdrop-blur-sm">
                 <div className="p-4 border-b border-neutral-700">
                   <div className="flex items-center gap-2">
-                    <IconSchool className="h-5 w-5 text-[#B07B50]" />
+                    <IconSchool className="h-5 w-5 text-blue-400" />
                     <h3 className="font-semibold text-white">Your Classes</h3>
                   </div>
                 </div>
-
+                
                 <div className="p-4 space-y-3">
                   {mockClasses.map((classItem) => (
                     <div key={classItem.id} className="border border-neutral-700 rounded-lg p-3 hover:bg-neutral-700/60 transition-colors">
@@ -537,7 +549,7 @@ const dockLinks = [
                 <h3 className="text-lg font-semibold text-white mb-4">
                   {selectedTemplate ? `Create from ${selectedTemplate.name}` : 'Create New Project'}
                 </h3>
-
+                
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-neutral-200 mb-2">
                     Project Name
@@ -547,14 +559,14 @@ const dockLinks = [
                     value={newProjectName}
                     onChange={(e) => setNewProjectName(e.target.value)}
                     placeholder="Enter project name"
-                    className="w-full px-3 py-2 bg-neutral-700/50 text-white border border-neutral-600 rounded-lg focus:ring-2 focus:ring-[#8B5E3C] focus:border-transparent transition-colors"
+                    className="w-full px-3 py-2 bg-neutral-700/50 text-white border border-neutral-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                     autoFocus
                   />
                 </div>
 
                 {selectedTemplate && (
-                  <div className="mb-4 p-3 bg-[#8B5E3C]/20 border border-[#8B5E3C]/30 rounded-lg">
-                    <p className="text-sm text-[#CFAF91]">
+                  <div className="mb-4 p-3 bg-blue-500/20 border border-blue-500/30 rounded-lg">
+                    <p className="text-sm text-blue-300">
                       <strong>Template:</strong> {selectedTemplate.description}
                     </p>
                   </div>
@@ -574,7 +586,7 @@ const dockLinks = [
                   <button
                     onClick={() => createProject(selectedTemplate)}
                     disabled={!newProjectName.trim()}
-                    className="px-4 py-2 bg-[#6A4028] hover:bg-[#4B2C1A] disabled:bg-neutral-600 text-white rounded-lg transition-all duration-300 hover:scale-105"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-neutral-600 text-white rounded-lg transition-all duration-300 hover:scale-105"
                   >
                     Create Project
                   </button>
@@ -670,7 +682,7 @@ const dockLinks = [
           scrollbar-color: transparent transparent;
         }
 
-        .scrollbar-thumb-[#8B5E3C] {
+        .scrollbar-thumb-blue-500 {
           scrollbar-color: rgba(59, 130, 246, 0.3) transparent;
         }
 
