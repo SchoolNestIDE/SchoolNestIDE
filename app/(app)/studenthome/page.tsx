@@ -139,37 +139,6 @@ export default function Page() {
         );
     }
 
-    const items = [
-        {
-            title: "Your Java Projects",
-            description: "Explore the birth of groundbreaking ideas and inventions.",
-            header: <JavaProjects />,
-            className: "md:col-span-2",
-            icon: <IconClipboardCopy className="h-4 w-4 text-neutral-500" />,
-        },
-        {
-            title: "Your Linux Terminal",
-            description: "Dive into the transformative power of technology.",
-            header: <Skeleton />,
-            className: "md:col-span-1",
-            icon: <IconFileBroken className="h-4 w-4 text-neutral-500" />,
-        },
-        {
-            title: "Your Clubs",
-            description: "Discover the beauty of thoughtful and functional design.",
-            header: <GenerateClubMeetingQRCode />,
-            className: "md:col-span-1",
-            icon: <IconSignature className="h-4 w-4 text-neutral-500" />,
-        },
-        {
-            title: "Etc.",
-            description:
-                "Understand the impact of effective communication in our lives.",
-            header: <p>stest</p>,
-            className: "md:col-span-2",
-            icon: <IconTableColumn className="h-4 w-4 text-neutral-500" />,
-        },
-    ];
 
 
     return (
@@ -210,19 +179,6 @@ export default function Page() {
                     items={links}
                 />
             </div>
-
-            <BentoGrid className="max-w-4xl mx-auto md:auto-rows-[20rem] pb-4">
-                {items.map((item, i) => (
-                    <BentoGridItem
-                        key={i}
-                        title={item.title}
-                        description={item.description}
-                        header={item.header}
-                        className={item.className}
-                        icon={item.icon}
-                    />
-                ))}
-            </BentoGrid>
 
         </>
 

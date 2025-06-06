@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
 import { Edit3, Play, Trash2, Plus, Download, Upload, Loader, Search, Terminal, Code } from 'lucide-react';
+import {IconCode} from '@tabler/icons-react';
 import dynamic from 'next/dynamic';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
@@ -553,13 +554,13 @@ print("Hello from ${newFileName}!")
                     <div className="flex items-center space-x-2">
                       <button
                         className={`flex-1 text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center space-x-3 border ${activeFile === file.filename
-                            ? "bg-blue-900/50 text-blue-200 border-blue-700"
+                            ? "bg-[#4a6741]/50 text-slate-200 border-slate-700"
                             : "text-neutral-400 hover:bg-neutral-800 border-transparent hover:border-neutral-700"
                           }`}
                         onClick={() => setActiveFile(file.filename)}
                       >
-                        <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm">
-                          <Code className="h-4 w-4 text-white" />
+                        <div className="w-8 h-8 bg-[#4a6741] rounded-lg flex items-center justify-center shadow-sm">
+                          <IconCode className="h-4 w-4 text-white" />
                         </div>
                         <span className="font-mono text-sm font-medium truncate flex-1">
                           {file.filename}
@@ -574,7 +575,7 @@ print("Hello from ${newFileName}!")
                               renameFile(file.filename, newName);
                             }
                           }}
-                          className="p-2 bg-neutral-800 hover:bg-blue-600 rounded-lg transition-all duration-200 border border-neutral-700 hover:border-blue-400"
+                          className="p-2 bg-neutral-800 hover:bg-emerald-800 rounded-lg transition-all duration-200 border border-neutral-700 hover:border-slate-400"
                           title="Rename file"
                         >
                           <Edit3 className="w-3.5 h-3.5 text-neutral-400 hover:text-white" />
@@ -597,7 +598,7 @@ print("Hello from ${newFileName}!")
           <div className="space-y-4 flex-shrink-0">
             <div className="grid grid-cols-2 gap-3">
               <button
-                className="rounded-lg py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium transition-all duration-200 border border-blue-500 hover:border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
+                className="rounded-lg py-3 px-4 bg-[#304529] hover:bg-[#4a6741] text-white font-medium transition-all duration-200 border border-slate-700 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
                 onClick={addFile}
               >
                 <Plus className="w-4 h-4" />
@@ -607,7 +608,7 @@ print("Hello from ${newFileName}!")
               <button
                 onClick={runCode}
                 disabled={!pyodideLoaded || isRunning}
-                className="rounded-lg py-3 px-4 bg-green-600 hover:bg-green-700 text-white font-medium transition-all duration-200 border border-green-500 hover:border-green-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
+                className="rounded-lg py-3 px-4 bg-[#304529] hover:bg-[#4a6741] text-white font-medium transition-all duration-200 border border-slate-700 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
               >
                 {isRunning ? (
                   <Loader className="h-4 w-4 animate-spin" />
@@ -619,13 +620,13 @@ print("Hello from ${newFileName}!")
 
               <button
                 onClick={handleExport}
-                className="rounded-lg py-3 px-4 bg-purple-600 hover:bg-purple-700 text-white font-medium transition-all duration-200 border border-purple-500 hover:border-purple-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
+                className="rounded-lg py-3 px-4 bg-[#304529] hover:bg-[#4a6741] text-white font-medium transition-all duration-200 border border-slate-700 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
               >
                 <Download className="w-4 h-4" />
                 <span className="text-sm">Export</span>
               </button>
 
-              <label className="rounded-lg py-3 px-4 bg-orange-600 hover:bg-orange-700 text-white font-medium cursor-pointer transition-all duration-200 border border-orange-500 hover:border-orange-400 disabled:opacity-50 flex items-center justify-center space-x-2 active:scale-[0.98]">
+              <label className="rounded-lg py-3 px-4 bg-[#304529] hover:bg-[#4a6741] text-white font-medium transition-all duration-200 border border-slate-700 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]">
                 <Upload className="w-4 h-4" />
                 <span className="text-sm">Import</span>
                 <input
@@ -669,7 +670,7 @@ print("Hello from ${newFileName}!")
                     <button
                       onClick={handlePackageSubmit}
                       disabled={!pyodideLoaded || isInstalling || !packageInput.trim()}
-                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm disabled:opacity-50"
+                      className="px-3 py-1 bg-[#304529] hover:bg-[#4a6741] text-white rounded text-sm disabled:opacity-50"
                     >
                       {isInstalling ? (
                         <Loader className="h-4 w-4 animate-spin mx-auto" />
@@ -791,8 +792,8 @@ print("Hello from ${newFileName}!")
                     line.startsWith('❌') || line.startsWith('Error:')
                       ? 'text-red-400'
                       : line.startsWith('✅') || line.startsWith('🚀') || line.startsWith('📦')
-                        ? 'text-blue-400'
-                        : 'text-green-400'
+                        ? 'text-slate-400'
+                        : 'text-white'
                   }
                 >
                   {line || '\u00A0'}
