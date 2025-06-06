@@ -232,7 +232,8 @@ export default function ProjectManager() {
 if __name__ == "__main__":
     main()`
         }
-      ]
+      ],
+      installedPackages: [] // Add package tracking
     };
 
     try {
@@ -278,14 +279,7 @@ if __name__ == "__main__":
 };
 
   const openIDE = (project) => {
-  const urlSafeName = project.name
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-
-  window.open(`/studenthome/python/ide?project=${urlSafeName}`, '_blank');
+  window.open(`/studenthome/python/ide?projectId=${project.id}`, '_blank');
 };
 
   const formatDate = (dateString) => {

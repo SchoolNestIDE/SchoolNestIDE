@@ -22,6 +22,51 @@ interface File {
   contents: string;
 }
 
+// Add these ABOVE the PythonIDE component
+const DB_NAME = 'PythonProjectsDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'projects';
+
+const openDB = () => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+    
+    request.onupgradeneeded = (event) => {
+      // @ts-ignore
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        store.createIndex('name', 'name', { unique: false });
+        store.createIndex('lastModified', 'lastModified', { unique: false });
+      }
+    };
+  });
+};
+
+const getProject = async (id) => {
+  const db = await openDB();
+  // @ts-ignore
+  const transaction = db.transaction([STORE_NAME], 'readonly');
+  const store = transaction.objectStore(STORE_NAME);
+  return new Promise((resolve, reject) => {
+    const request = store.get(id);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+const saveProject = async (project) => {
+  const db = await openDB();
+  // @ts-ignore
+  const transaction = db.transaction([STORE_NAME], 'readwrite');
+  const store = transaction.objectStore(STORE_NAME);
+  return store.put(project);
+};
+
+
 const PythonIDE = () => {
   const [files, setFiles] = useState<File[]>([
     {
@@ -71,6 +116,9 @@ print(f"Word count: {len(text.split())}")
   const [showPackageManager, setShowPackageManager] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editorRef = useRef<any>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [project, setProject] = useState<any>(null);
+
 
   // Common packages that work well with Pyodide
   const commonPackages = [
@@ -78,35 +126,89 @@ print(f"Word count: {len(text.split())}")
     'micropip', 'pytz', 'packaging', 'pillow', 'requests'
   ];
 
-
-  // Initialize Pyodide
   useEffect(() => {
-    const loadPyodide = async () => {
+    const queryParams = new URLSearchParams(window.location.search);
+    const projectIdParam = queryParams.get('projectId');
+    if (projectIdParam) {
+      setProjectId(projectIdParam);
+    }
+  }, []);
+
+  // Fetch project data
+  useEffect(() => {
+    const loadProject = async () => {
+      if (!projectId) return;
+      
       try {
-        setOutputLines(['Initializing Python runtime...']);
-        setLoadingProgress('Loading Pyodide...');
+        const projectData = await getProject(projectId);
+        if (projectData) {
+          setProject(projectData);
+          //@ts-ignore
+          setFiles(projectData.files || []);
+          //@ts-ignore
+          setInstalledPackages(projectData.installedPackages || []);
+          //@ts-ignore
+          if (projectData.files?.length > 0) {
+            //@ts-ignore
+            setActiveFile(projectData.files[0].filename);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading project:', error);
+      }
+    };
 
-        // Check if script already exists
-        if (!document.querySelector('script[src*="pyodide"]')) {
-          const script = document.createElement('script');
-          script.src = 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js';
+    loadProject();
+  }, [projectId]);
 
-          script.onload = async () => {
-            try {
-              setLoadingProgress('Initializing Python environment...');
+  // Save project on changes
+  useEffect(() => {
+    const saveProjectData = async () => {
+      if (!project || !projectId) return;
+      
+      const updatedProject = {
+        ...project,
+        files,
+        installedPackages,
+        lastModified: new Date().toISOString()
+      };
+      
+      await saveProject(updatedProject);
+      setProject(updatedProject);
+    };
 
-              window.pyodide = await window.loadPyodide({
-                indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/',
-                stdout: (text) => {
-                  setOutputLines(prev => [...prev, text]);
-                },
-                stderr: (text) => {
-                  setOutputLines(prev => [...prev, `Error: ${text}`]);
-                }
-              });
+    const timer = setTimeout(saveProjectData, 1000);
+    return () => clearTimeout(timer);
+  }, [files, installedPackages]);
 
-              // Setup Python output capture
-              await window.pyodide.runPython(`
+
+  useEffect(() => {
+  const loadPyodide = async () => {
+    try {
+      setOutputLines(['Initializing Python runtime...']);
+      setLoadingProgress('Loading Pyodide...');
+
+      // Check if script already exists
+      if (!document.querySelector('script[src*="pyodide"]')) {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js';
+
+        script.onload = async () => {
+          try {
+            setLoadingProgress('Initializing Python environment...');
+
+            window.pyodide = await window.loadPyodide({
+              indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/',
+              stdout: (text) => {
+                setOutputLines(prev => [...prev, text]);
+              },
+              stderr: (text) => {
+                setOutputLines(prev => [...prev, `Error: ${text}`]);
+              }
+            });
+
+            // Setup Python output capture
+            await window.pyodide.runPython(`
 import sys
 import io
 from contextlib import redirect_stdout, redirect_stderr
@@ -134,36 +236,55 @@ class OutputCapture:
 output_capture = OutputCapture()
 `);
 
-              setPyodideLoaded(true);
-              setLoadingProgress('');
-              setOutputLines(['Python runtime loaded', 'Ready to execute', '']);
-
-            } catch (error) {
-              console.error('Error initializing Pyodide:', error);
-              setLoadingProgress('');
-              //@ts-ignore
-              setOutputLines([`Failed to initialize Python runtime: ${error.message}`]);
-            }
-          };
-
-          script.onerror = (error) => {
-            console.error('Script loading error:', error);
+            setPyodideLoaded(true);
             setLoadingProgress('');
-            setOutputLines(['Failed to load Pyodide script']);
-          };
+            setOutputLines(prev => [...prev, 'Python runtime loaded', 'Ready to execute', '']);
 
-          document.head.appendChild(script);
-        }
-      } catch (error) {
-        console.error('Error loading Pyodide:', error);
-        setLoadingProgress('');
-        //@ts-ignore
-        setOutputLines([`Error loading Python runtime: ${error.message}`]);
+          } catch (error) {
+            console.error('Error initializing Pyodide:', error);
+            setLoadingProgress('');
+            //@ts-ignore
+            setOutputLines([`Failed to initialize Python runtime: ${error.message}`]);
+          }
+        };
+
+        script.onerror = (error) => {
+          console.error('Script loading error:', error);
+          setLoadingProgress('');
+          setOutputLines(['Failed to load Pyodide script']);
+        };
+
+        document.head.appendChild(script);
       }
-    };
+    } catch (error) {
+      console.error('Error loading Pyodide:', error);
+      setLoadingProgress('');
+      //@ts-ignore
+      setOutputLines([`Error loading Python runtime: ${error.message}`]);
+    }
+  };
 
-    loadPyodide();
-  }, []);
+  loadPyodide();
+}, []);
+
+// Restore packages when both Pyodide is loaded and packages are available
+useEffect(() => {
+  const restorePackages = async () => {
+    if (!pyodideLoaded || !window.pyodide || installedPackages.length === 0) return;
+
+    setOutputLines(prev => [...prev, 'Restoring installed packages...']);
+    for (const pkg of installedPackages) {
+      try {
+        await window.pyodide.loadPackage(pkg);
+        setOutputLines(prev => [...prev, `Restored ${pkg}`]);
+      } catch (error) {//@ts-ignore
+        setOutputLines(prev => [...prev, `Failed to restore ${pkg}: ${error.message}`]);
+      }
+    }
+  };
+
+  restorePackages();
+}, [pyodideLoaded, installedPackages]);
 
   const handleEditorDidMount = (editor: any) => {
     editorRef.current = editor;
@@ -261,6 +382,7 @@ print("Hello from ${newFileName}!")
 
     setFiles([...files, newFile]);
     setActiveFile(newFileName);
+    
   };
 
 
@@ -367,6 +489,12 @@ print("Hello from ${newFileName}!")
     } finally {
       setIsInstalling(false);
     }
+
+    if (!installedPackages.includes(packageName)) {
+      const newPackages = [...installedPackages, packageName];
+      setInstalledPackages(newPackages);
+    }
+
   };
 
   const handlePackageSubmit = async (e: any) => {
@@ -558,7 +686,7 @@ print("Hello from ${newFileName}!")
                         disabled={!pyodideLoaded || isInstalling || installedPackages.includes(pkg)}
                         className="text-center p-2 text-xs bg-neutral-800 hover:bg-neutral-700 disabled:bg-neutral-900 disabled:opacity-50 rounded border border-neutral-700 hover:border-neutral-600"
                       >
-                        {installedPackages.includes(pkg) ? pkg : ''}
+                        {installedPackages.includes(pkg) ? '' : ''}
                         {pkg}
                       </button>
                     ))}
