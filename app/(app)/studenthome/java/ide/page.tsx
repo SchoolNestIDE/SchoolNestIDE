@@ -19,6 +19,7 @@ import {
   IconPlayerPlayFilled,
   IconCloudUpload,
   IconBrandGithub,
+  IconDeviceFloppy,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -26,7 +27,6 @@ import Image from "next/image";
 import { cn } from "@/app/lib/utils";
 
 import React, { useEffect, useRef, useState } from 'react';
-import { useSession } from "next-auth/react";
 import dynamic from 'next/dynamic';
 import { useSearchParams } from "next/navigation";
 import {Code, Edit3, Play, Trash2} from "lucide-react";
@@ -48,9 +48,57 @@ interface File {
 }
 
 interface Project {
-  project_name: string,
-  files: File[]
+  id: string;
+  name: string;
+  created: string;
+  lastModified: string;
+  files: File[];
 }
+
+// IndexedDB Configuration (copied from ProjectManager)
+const DB_NAME = 'JavaProjectsDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'projects';
+
+const openDB = () => {
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+    
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        store.createIndex('name', 'name', { unique: false });
+        store.createIndex('lastModified', 'lastModified', { unique: false });
+      }
+    };
+  });
+};
+
+const saveProject = async (project: Project) => {
+  const db = await openDB();
+  const transaction = db.transaction([STORE_NAME], 'readwrite');
+  const store = transaction.objectStore(STORE_NAME);
+  return new Promise<void>((resolve, reject) => {
+    const request = store.put(project);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+const getProject = async (id: string) => {
+  const db = await openDB();
+  const transaction = db.transaction([STORE_NAME], 'readonly');
+  const store = transaction.objectStore(STORE_NAME);
+  return new Promise<Project>((resolve, reject) => {
+    const request = store.get(id);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
 
 const Editor = () => {
   const [files, setFiles] = useState<File[]>([
@@ -161,28 +209,50 @@ public class CustomFileInputStream extends InputStream {
   const monacoEditorRef = useRef<any>(null);
   const [open, setOpen] = useState(false);
   const searchParams = useSearchParams();
-  const projectFromUrl = searchParams.get("project") ?? "";
-  const [signedIn, setSignedIn] = useState(false);
-  const [name, setName] = useState('');
-  const [project, setProject] = useState(projectFromUrl);
-  const [projectList, setProjectList] = useState<string[]>([]);
-  const { data: session } = useSession();
+  const projectId = searchParams.get("projectId") ?? "";
+  const [projectData, setProjectData] = useState<Project | null>(null);
+  const [loading, setLoading] = useState(true);
   const [outputHeight, setOutputHeight] = useState(200);
 
-  const saveProject = async () => {
-    try {
-      const response = await fetch('/api/student/save_files/post', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ project, files })
-      });
+  // Load project from IndexedDB
+  useEffect(() => {
+    const loadProject = async () => {
+      if (!projectId) return;
+      
+      try {
+        const project = await getProject(projectId);
+        setProjectData(project);
+        setFiles(project.files);
+        setActiveFile(project.files[0]?.filename || 'Main.java');
+      } catch (error) {
+        console.error('Error loading project:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    } catch (errors: any) {
-      console.log(errors);
+    loadProject();
+  }, [projectId]);
+
+  // Save project to IndexedDB
+  const saveProjectToDB = async () => {
+    if (!projectData) return;
+    
+    const updatedProject: Project = {
+      ...projectData,
+      files: files.filter(f => f.filename !== 'CustomFileInputStream.java'),
+      lastModified: new Date().toISOString()
+    };
+    
+    try {
+      await saveProject(updatedProject);
+      setProjectData(updatedProject);
+      setOutputLines(prev => [...prev, 'Project saved successfully!']);
+    } catch (error) {
+      console.error('Error saving project:', error);
+      setOutputLines(prev => [...prev, 'Error saving project!']);
     }
-  }
+  };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -203,57 +273,6 @@ public class CustomFileInputStream extends InputStream {
 
     reader.readAsText(file);
   };
-
-  useEffect(() => {
-    if (session && session.user.role == 'student') {
-      setSignedIn(true);
-
-      const getStudentInfo = async () => {
-        const response = await fetch('/api/student/get_studentinfo/post', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-
-        const data = await response.json();
-        setName(data.firstname + ' ' + data.lastname);
-      }
-      getStudentInfo();
-
-      const getProjectFiles = async () => {
-        const response = await fetch('/api/student/get_files/post', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ project_name: project })
-        });
-
-        const data = await response.json();
-
-        if (data.project) {
-          setFiles(data.project.files);
-        } else {
-          alert('Project not found');
-        }
-      }
-      getProjectFiles();
-
-      const getProjects = async () => {
-        const response = await fetch('/api/student/get_projectlist/post', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-
-        const data = await response.json();
-        setProjectList(data.java_project_names);
-      }
-      getProjects();
-    }
-  }, []);
 
   // Load WASM compiler
   useEffect(() => {
@@ -305,7 +324,9 @@ public class CustomFileInputStream extends InputStream {
     };
 
     loadCheerpJ();
-    setActiveFile('Main.java');
+    if (files.length > 0) {
+      setActiveFile(files[0].filename);
+    }
   }, []);
 
   const getInput = () => {
@@ -677,6 +698,17 @@ public class CustomFileInputStream extends InputStream {
     },
   ];
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-neutral-950 flex items-center justify-center">
+        <div className="text-center">
+          <IconCoffee className="h-12 w-12 mx-auto text-[#6A4028] animate-pulse" />
+          <p className="mt-2 text-gray-400">Loading project...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
       <div
           className={cn(
@@ -695,26 +727,6 @@ public class CustomFileInputStream extends InputStream {
                 ))}
               </div>
             </div>
-            <div>
-              {signedIn ?
-                  <SidebarLink
-                      link={{
-                        label: name,
-                        href: "#",
-                        icon: (
-                            <Image
-                                src="/sc_logo.png"
-                                className="h-7 w-7 flex-shrink-0 rounded-full border border-slate-400"
-                                width={50}
-                                height={50}
-                                alt="Avatar"
-                            />
-                        ),
-                      }} />
-                  :
-                  null
-              }
-            </div>
           </SidebarBody>
         </Sidebar>
 
@@ -725,6 +737,11 @@ public class CustomFileInputStream extends InputStream {
           <div className="p-6 -mt-2 h-full flex flex-col overflow-hidden">
             <div className="mb-4 flex-shrink-0 font-bold flex items-center gap-2">
               Java IDE
+              {projectData && (
+                <span className="text-sm font-normal text-neutral-500 ml-2 truncate">
+                  {projectData.name}
+                </span>
+              )}
             </div>
 
             <div
@@ -845,6 +862,16 @@ public class CustomFileInputStream extends InputStream {
                   />
                 </label>
               </div>
+
+              {/* Save button */}
+              <button
+                  className="w-full rounded-lg py-3 px-4 bg-[#6A4028] hover:bg-[#4B2C1A] text-white font-medium transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] flex items-center justify-center space-x-2 active:scale-[0.98]"
+                  onClick={saveProjectToDB}
+                  disabled={!cheerpjLoaded}
+              >
+                  <IconDeviceFloppy className="w-4 h-4" />
+                  <span className="text-sm">Save Project</span>
+              </button>
 
               {!cheerpjLoaded && (
                   <div className="mt-4 p-4 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg">

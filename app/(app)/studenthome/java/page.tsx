@@ -15,27 +15,41 @@ import {
   IconHome,
   IconDeviceLaptop,
   IconBrandGithub,
-  IconChalkboard
+  IconChalkboard,
+  IconDeviceFloppy
 } from '@tabler/icons-react';
-// Remove this import line:
-// import { FloatingNav } from "@/app/components/ui/floating-navbar";
 import { BackgroundLines } from "@/app/components/ui/background-lines";
 
-// IndexedDB helper functions
+// IndexedDB Configuration
 const DB_NAME = 'JavaProjectsDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'projects';
-//@ts-ignore
+
+interface File {
+  filename: string;
+  contents: string;
+}
+
+interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  created: string;
+  lastModified: string;
+  files: File[];
+  template?: boolean;
+}
+
+// IDB Helper Functions
 const openDB = () => {
-  return new Promise((resolve, reject) => {
+  return new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
     
     request.onupgradeneeded = (event) => {
-        //@ts-ignore
-      const db = event.target.result;
+      const db = (event.target as IDBOpenDBRequest).result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
         store.createIndex('name', 'name', { unique: false });
@@ -45,42 +59,48 @@ const openDB = () => {
   });
 };
 
-
-const saveProject = async (project) => {
+const saveProject = async (project: Project) => {
   const db = await openDB();
-  // @ts-ignore
   const transaction = db.transaction([STORE_NAME], 'readwrite');
   const store = transaction.objectStore(STORE_NAME);
-  return store.put(project);
+  return new Promise<void>((resolve, reject) => {
+    const request = store.put(project);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
 };
 
 const getProjects = async () => {
   const db = await openDB();
-  // @ts-ignore
   const transaction = db.transaction([STORE_NAME], 'readonly');
   const store = transaction.objectStore(STORE_NAME);
-  return new Promise((resolve, reject) => {
+  return new Promise<Project[]>((resolve, reject) => {
     const request = store.getAll();
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
 };
 
-const deleteProject = async (id) => {
+const deleteProject = async (id: string) => {
   const db = await openDB();
-  // @ts-ignore
   const transaction = db.transaction([STORE_NAME], 'readwrite');
   const store = transaction.objectStore(STORE_NAME);
-  return store.delete(id);
+  return new Promise<void>((resolve, reject) => {
+    const request = store.delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
 };
 
-// Template projects
-const templateProjects = [
+// Template Projects
+const templateProjects: Project[] = [
   {
     id: 'template-hello-world',
     name: 'Hello World',
     description: 'Basic Java application with main method',
     template: true,
+    created: new Date().toISOString(),
+    lastModified: new Date().toISOString(),
     files: [
       {
         filename: 'Main.java',
@@ -97,6 +117,8 @@ const templateProjects = [
     name: 'Simple Calculator',
     description: 'Basic calculator with arithmetic operations',
     template: true,
+    created: new Date().toISOString(),
+    lastModified: new Date().toISOString(),
     files: [
       {
         filename: 'Calculator.java',
@@ -146,69 +168,6 @@ public class Calculator {
 }`
       }
     ]
-  },
-  {
-    id: 'template-oop-basics',
-    name: 'OOP Basics',
-    description: 'Object-oriented programming example with classes',
-    template: true,
-    files: [
-      {
-        filename: 'Student.java',
-        contents: `public class Student {
-    private String name;
-    private int age;
-    private String studentId;
-    
-    public Student(String name, int age, String studentId) {
-        this.name = name;
-        this.age = age;
-        this.studentId = studentId;
-    }
-    
-    public String getName() {
-        return name;
-    }
-    
-    public void setName(String name) {
-        this.name = name;
-    }
-    
-    public int getAge() {
-        return age;
-    }
-    
-    public void setAge(int age) {
-        this.age = age;
-    }
-    
-    public String getStudentId() {
-        return studentId;
-    }
-    
-    public void displayInfo() {
-        System.out.println("Name: " + name);
-        System.out.println("Age: " + age);
-        System.out.println("Student ID: " + studentId);
-    }
-}`
-      },
-      {
-        filename: 'Main.java',
-        contents: `public class Main {
-    public static void main(String[] args) {
-        Student student1 = new Student("John Doe", 20, "ST001");
-        Student student2 = new Student("Jane Smith", 19, "ST002");
-        
-        System.out.println("Student 1 Information:");
-        student1.displayInfo();
-        
-        System.out.println("\\nStudent 2 Information:");
-        student2.displayInfo();
-    }
-}`
-      }
-    ]
   }
 ];
 
@@ -218,10 +177,10 @@ const mockClasses = [
 ];
 
 export default function ProjectManager() {
-  const [projects, setProjects] = useState([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -231,8 +190,9 @@ export default function ProjectManager() {
   const loadProjects = async () => {
     try {
       const savedProjects = await getProjects();
-      // @ts-ignore
-      setProjects(savedProjects.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified)));
+      setProjects(savedProjects.sort((a, b) => 
+        new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
+      ));
     } catch (error) {
       console.error('Error loading projects:', error);
     } finally {
@@ -240,15 +200,15 @@ export default function ProjectManager() {
     }
   };
 
-  const createProject = async (template = null) => {
+  const createProject = async (template: Project | null = null) => {
     if (!newProjectName.trim()) return;
 
-    const newProject = {
+    const newProject: Project = {
       id: `project-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       name: newProjectName,
       created: new Date().toISOString(),
       lastModified: new Date().toISOString(),
-      files: template ? template.files : [
+      files: template ? [...template.files] : [
         {
           filename: 'Main.java',
           contents: `public class Main {
@@ -266,54 +226,36 @@ export default function ProjectManager() {
       setNewProjectName('');
       setSelectedTemplate(null);
       setShowCreateModal(false);
+      openIDE(newProject);
     } catch (error) {
       console.error('Error creating project:', error);
     }
   };
 
-  const createFromTemplate = (template) => {
+  const createFromTemplate = (template: Project) => {
     setSelectedTemplate(template);
     setNewProjectName(template.name + ' Project');
     setShowCreateModal(true);
   };
 
-  const removeProject = async (projectId) => {
-  // Use window.confirm to ensure compatibility
-  const confirmed = window.confirm('Are you sure you want to delete this project? This action cannot be undone.');
-  
-  if (confirmed) {
+  const removeProject = async (projectId: string) => {
+    const confirmed = window.confirm('Are you sure you want to delete this project?');
+    if (!confirmed) return;
+
     try {
-      console.log('Attempting to delete project:', projectId); // Debug log
       await deleteProject(projectId);
-      
-      // Update the state to remove the project from the UI
-      setProjects(prev => {
-        const updatedProjects = prev.filter(p => p.id !== projectId);
-        console.log('Projects after deletion:', updatedProjects.length); // Debug log
-        return updatedProjects;
-      });
-      
-      console.log('Project deleted successfully'); // Debug log
+      setProjects(prev => prev.filter(p => p.id !== projectId));
     } catch (error) {
       console.error('Error deleting project:', error);
-      // Show user-friendly error message
       alert('Failed to delete project. Please try again.');
     }
-  }
-};
+  };
 
-  const openIDE = (project) => {
-  const urlSafeName = project.name
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+  const openIDE = (project: Project) => {
+    window.open(`/studenthome/java/ide?projectId=${project.id}`, '_blank');
+  };
 
-  window.open(`/studenthome/java/ide?project=${urlSafeName}`, '_blank');
-};
-
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -322,7 +264,8 @@ export default function ProjectManager() {
       minute: '2-digit'
     });
   };
-const dockLinks = [
+
+  const dockLinks = [
     {
       title: "Back Home",
       icon: <IconHome className="h-full w-full text-[#B07B50]" />,
@@ -353,25 +296,22 @@ const dockLinks = [
 
   return (
     <>
-      {/* Remove this line to get rid of the floating nav bar: */}
-      {/* <FloatingNav className="z-50" /> */}
-      
       <div className="pt-32 px-4 min-h-screen bg-neutral-950 text-white">
         <div className="max-w-7xl mx-auto">
-          <div className="relative mb-16"> {/* Increased margin from mb-12 to mb-16 */}
-  <BackgroundLines className="opacity-10 absolute inset-0">
-    <div className="absolute inset-0" />
-  </BackgroundLines>
+          <div className="relative mb-16">
+            <BackgroundLines className="opacity-10 absolute inset-0">
+              <div className="absolute inset-0" />
+            </BackgroundLines>
 
             <div className="text-center relative z-10">
-              <h1 className="text-4xl md:text-6xl lg:text-7xl bg-clip-text text-transparent bg-gradient-to-b from-[#D2B48C] via-[#8B5E3C] to-[#4B3621] font-bold mb-4 leading-tight"> {/* Added leading-tight and increased mb-4 to mb-6 */}
+              <h1 className="text-4xl md:text-6xl lg:text-7xl bg-clip-text text-transparent bg-gradient-to-b from-[#D2B48C] via-[#8B5E3C] to-[#4B3621] font-bold mb-4 leading-tight">
                 Java Project Manager
               </h1>
               <p className="text-neutral-400 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-8">
                 Create, manage, and organize your Java projects
               </p>
 
-              <div className="flex justify-center mb-12"> {/* Increased margin from mb-12 to mb-16 */}
+              <div className="flex justify-center mb-12">
                 <div className="flex space-x-4 p-4 bg-neutral-900/80 backdrop-blur-xl rounded-2xl border border-neutral-700/40 shadow-2xl">
                   {dockLinks.map((link, index) => (
                     <div key={index} className="relative group">
@@ -584,99 +524,6 @@ const dockLinks = [
           )}
         </div>
       </div>
-
-      <style jsx global>{`
-        /* Disable scrolling */
-        html, body {
-          overflow: hidden !important;
-          height: 100vh !important;
-        }
-
-        .bento-grid-item {
-          overflow: hidden !important;
-          border-radius: 1rem !important;
-          contain: layout style paint;
-        }
-
-        .bento-grid-item > div {
-          height: 100% !important;
-          overflow: hidden !important;
-          box-sizing: border-box;
-        }
-
-        .bento-scroll-container {
-          scrollbar-width: thin;
-          scrollbar-color: rgba(59, 130, 246, 0.3) transparent;
-          scroll-behavior: smooth;
-        }
-
-        .bento-scroll-container::-webkit-scrollbar {
-          width: 4px;
-        }
-
-        .bento-scroll-container::-webkit-scrollbar-track {
-          background: transparent;
-          border-radius: 2px;
-        }
-
-        .bento-scroll-container::-webkit-scrollbar-thumb {
-          background: rgba(59, 130, 246, 0.3);
-          border-radius: 2px;
-          transition: background-color 0.2s ease;
-        }
-
-        .bento-scroll-container::-webkit-scrollbar-thumb:hover {
-          background: rgba(59, 130, 246, 0.5);
-        }
-
-        .bento-scroll-container {
-          overscroll-behavior: contain;
-        }
-
-        html {
-          scroll-behavior: smooth;
-        }
-
-        ::-webkit-scrollbar {
-          width: 6px;
-        }
-
-        ::-webkit-scrollbar-track {
-          background: rgba(0, 0, 0, 0.1);
-          border-radius: 3px;
-        }
-
-        ::-webkit-scrollbar-thumb {
-          background: rgba(59, 130, 246, 0.5);
-          border-radius: 3px;
-          transition: background-color 0.2s ease;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-          background: rgba(59, 130, 246, 0.7);
-        }
-
-        .truncate {
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-
-        .scrollbar-thin {
-          scrollbar-width: thin;
-        }
-
-        .scrollbar-track-transparent {
-          scrollbar-color: transparent transparent;
-        }
-
-        .scrollbar-thumb-[#8B5E3C] {
-          scrollbar-color: rgba(59, 130, 246, 0.3) transparent;
-        }
-
-        .scrollbar-thumb-rounded-full {
-        }
-      `}</style>
     </>
   );
 }
