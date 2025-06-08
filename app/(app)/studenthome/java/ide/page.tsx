@@ -712,7 +712,7 @@ public class CustomFileInputStream extends InputStream {
   return (
       <div
           className={cn(
-              "rounded-md flex flex-col md:flex-row bg-black w-full flex-1 border border-slate-800 overflow-hidden",
+              "rounded-md flex flex-col md:flex-row bg-black w-full flex-1 border border-slate-800 overflow-auto",
               "h-screen"
           )}
       >
@@ -865,7 +865,7 @@ public class CustomFileInputStream extends InputStream {
 
               {/* Save button */}
               <button
-                  className="w-full rounded-lg py-3 px-4 bg-[#6A4028] hover:bg-[#4B2C1A] text-white font-medium transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] flex items-center justify-center space-x-2 active:scale-[0.98]"
+                  className="w-full rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium cursor-pointer transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 flex items-center justify-center space-x-2 active:scale-[0.98]"
                   onClick={saveProjectToDB}
                   disabled={!cheerpjLoaded}
               >

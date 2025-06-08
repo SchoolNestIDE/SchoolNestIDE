@@ -173,7 +173,7 @@ public class Calculator {
 
 // Mock class data
 const mockClasses = [
-  { id: 1, name: "Computer Science", code: "CS301", instructor: "Prof. Brown" }
+  { id: 1, name: "Algorithms Data AB", code: "CSA25", instructor: "Mr. Mark Estep" }
 ];
 
 export default function ProjectManager() {
@@ -182,6 +182,7 @@ export default function ProjectManager() {
   const [newProjectName, setNewProjectName] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [validationError, setValidationError] = useState<string | null>(null); // Added validation error state
 
   useEffect(() => {
     loadProjects();
@@ -200,12 +201,46 @@ export default function ProjectManager() {
     }
   };
 
+  // Validate project name
+  const validateProjectName = (name: string): string | null => {
+    const trimmedName = name.trim();
+    
+    if (!trimmedName) {
+      return 'Project name is required';
+    }
+    
+    if (trimmedName.length < 3) {
+      return 'Project name must be at least 3 characters';
+    }
+    
+    if (trimmedName.length > 50) {
+      return 'Project name cannot exceed 50 characters';
+    }
+    
+    // Check for duplicate names (case-insensitive)
+    const nameExists = projects.some(
+      project => project.name.toLowerCase() === trimmedName.toLowerCase()
+    );
+    
+    if (nameExists) {
+      return 'A project with this name already exists';
+    }
+    
+    return null;
+  };
+
   const createProject = async (template: Project | null = null) => {
-    if (!newProjectName.trim()) return;
+    const trimmedName = newProjectName.trim();
+    const error = validateProjectName(trimmedName);
+    
+    if (error) {
+      setValidationError(error);
+      return;
+    }
 
     const newProject: Project = {
       id: `project-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name: newProjectName,
+      name: trimmedName, // Use trimmed name
       created: new Date().toISOString(),
       lastModified: new Date().toISOString(),
       files: template ? [...template.files] : [
@@ -225,6 +260,7 @@ export default function ProjectManager() {
       setProjects(prev => [newProject, ...prev]);
       setNewProjectName('');
       setSelectedTemplate(null);
+      setValidationError(null); // Clear validation error
       setShowCreateModal(false);
       openIDE(newProject);
     } catch (error) {
@@ -235,6 +271,7 @@ export default function ProjectManager() {
   const createFromTemplate = (template: Project) => {
     setSelectedTemplate(template);
     setNewProjectName(template.name + ' Project');
+    setValidationError(null); // Clear previous errors
     setShowCreateModal(true);
   };
 
@@ -351,7 +388,10 @@ export default function ProjectManager() {
                     </div>
                     {projects.length > 0 && (
                       <button
-                        onClick={() => setShowCreateModal(true)}
+                        onClick={() => {
+                          setShowCreateModal(true);
+                          setValidationError(null); // Clear errors when opening modal
+                        }}
                         className="flex items-center gap-1 bg-[#6A4028] hover:bg-[#4B2C1A] text-white px-3 py-1.5 rounded-lg text-sm transition-all duration-300 hover:scale-105 group"
                       >
                         <IconPlus className="h-4 w-4 group-hover:rotate-90 transition-transform duration-300" />
@@ -368,7 +408,10 @@ export default function ProjectManager() {
                       <h3 className="text-lg font-medium text-white mb-2">No projects yet</h3>
                       <p className="text-neutral-400 mb-4">Create your first Java project to get started</p>
                       <button
-                        onClick={() => setShowCreateModal(true)}
+                        onClick={() => {
+                          setShowCreateModal(true);
+                          setValidationError(null); // Clear errors when opening modal
+                        }}
                         className="bg-[#9c6f44] hover:bg-[#4B2C1A] text-white px-4 py-2 rounded-lg transition-colors duration-300 hover:scale-105"
                       >
                         Create Project
@@ -485,11 +528,25 @@ export default function ProjectManager() {
                   <input
                     type="text"
                     value={newProjectName}
-                    onChange={(e) => setNewProjectName(e.target.value)}
+                    onChange={(e) => {
+                      setNewProjectName(e.target.value);
+                      // Clear error when user starts typing
+                      if (validationError) setValidationError(null);
+                    }}
                     placeholder="Enter project name"
-                    className="w-full px-3 py-2 bg-neutral-700/50 text-white border border-neutral-600 rounded-lg focus:ring-2 focus:ring-[#8B5E3C] focus:border-transparent transition-colors"
+                    className={`w-full px-3 py-2 bg-neutral-700/50 text-white border rounded-lg focus:ring-2 focus:border-transparent transition-colors ${
+                      validationError 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-neutral-600 focus:ring-[#8B5E3C]'
+                    }`}
                     autoFocus
                   />
+                  {validationError && (
+                    <p className="text-red-400 text-sm mt-2">{validationError}</p>
+                  )}
+                  <p className="text-neutral-400 text-xs mt-2">
+                    {newProjectName.trim().length}/50 characters
+                  </p>
                 </div>
 
                 {selectedTemplate && (
@@ -506,6 +563,7 @@ export default function ProjectManager() {
                       setShowCreateModal(false);
                       setNewProjectName('');
                       setSelectedTemplate(null);
+                      setValidationError(null); // Clear error
                     }}
                     className="px-4 py-2 text-neutral-400 hover:text-neutral-200 transition-colors"
                   >
@@ -514,7 +572,11 @@ export default function ProjectManager() {
                   <button
                     onClick={() => createProject(selectedTemplate)}
                     disabled={!newProjectName.trim()}
-                    className="px-4 py-2 bg-[#6A4028] hover:bg-[#4B2C1A] disabled:bg-neutral-600 text-white rounded-lg transition-all duration-300 hover:scale-105"
+                    className={`px-4 py-2 text-white rounded-lg transition-all duration-300 hover:scale-105 ${
+                      validationError 
+                        ? 'bg-red-500/80 hover:bg-red-500' 
+                        : 'bg-[#6A4028] hover:bg-[#4B2C1A] disabled:bg-neutral-600'
+                    }`}
                   >
                     Create Project
                   </button>
