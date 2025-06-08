@@ -39,7 +39,9 @@ mount -t tmpfs /tmp/new-chroot/tmp /tmp/new-chroot/tmp
 mkdir /tmp/new-chroot/tmp/rootfs
 mount --bind / /tmp/new-chroot/tmp/rootfs
 mkdir /tmp/new-chroot/tmp/jdk
-mount --bind /mnt/_internal/jdk /tmp/new-chroot/tmp/jdk
+cp -rvf /mnt/_internal/jdk /tmp/jdk
+
+mount --bind /tmp/jdk /tmp/new-chroot/tmp/jdk
 mkdir /dev/pts
 mount -t devpts /dev/pts /dev/pts
 mount --bind /mnt/$PROJNAME /home/nest

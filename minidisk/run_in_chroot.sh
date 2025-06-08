@@ -3,4 +3,4 @@ set +x
 DIR_TO_BINDMOUNT=${PWD}
 cp /in_chroot.sh /tmp/new-chroot/tmp/.
 
-unshare -Ur -R /tmp/new-chroot env - LD_LIBRARY_PATH=/tmp/jdk/lib  PATH=$PATH:/tmp/jdk/bin  /tmp/jdk/bin/$@
+/tmp/new-chroot/lib/ld-linux.so.2 --inhibit-cache --library-path /tmp/new-chroot/lib/i386-linux-gnu:/tmp/new-chroot/usr/lib/i386-linux-gnu /tmp/new-chroot/tmp/jdk/bin/$@

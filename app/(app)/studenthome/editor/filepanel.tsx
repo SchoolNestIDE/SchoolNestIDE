@@ -70,11 +70,13 @@ function FileSystemNode({ path, padding, visibility, root }: {
           fm.RemoveWatcher(id, ref);
           return;
         }
+        setTimeout(()=>{
         let fList = fm.read_dir(path);
         setFileList(fList);
         setTimeout(async () => {
           await fm.persist()
         })
+      });
       })
 
     })();

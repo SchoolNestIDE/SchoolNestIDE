@@ -10,6 +10,7 @@ if [ -z "$MOUNT_DIR" ]
 then
     exit 0;
 fi
+mount -t tmpfs -o exec none "$MOUNT_DIR"
 sudo tar -C "$MOUNT_DIR" -xf output.tar
 
 #make -C .. docker

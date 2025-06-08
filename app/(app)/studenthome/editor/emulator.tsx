@@ -133,10 +133,13 @@ function EmulatorProvider({ children }: { children: React.ReactNode }) {
       let u = new URL(location.href);
       u.pathname = "";
       u.protocol = "http:";
+
       let pName = u.searchParams.get('projectname');
       if (!pName) {
         pName = "Default";
       }
+      u.search = "";
+
       let initArgs = [u.href.slice(0,-1), pName];
       let initArgsB64 = initArgs.map(v=>btoa(v));
       let final = initArgsB64.join(" ");

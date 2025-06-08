@@ -1,6 +1,6 @@
 const ps = require('path');
 import 'buffer';
-import React, { createContext, useContext, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import * as IDB from './indexeddb'
 import { Button } from '@nextui-org/react';
 import { GoogleReCaptchaContext } from 'react-google-recaptcha-v3';
@@ -203,7 +203,8 @@ async function ct(ghCtx: GitCtx, fs: any, path: string, idx: number) {
     currentElement.sha = r.sha;
   }
   else {
-    bytesToBase64(fs.read_file())
+    let d = bytesToBase64(await fs.read_file(path));
+    console.log(d);
   }
 }
 interface GitCtx {
@@ -444,7 +445,7 @@ async function craftTree(gitCtx: GitCtx, fs: any, cb:(gitCtx: GitCtx, fs:any, pa
   }
   
   for (let s of arr) {
-    o.push( await cb(gitCtx, fs,c + "/" + s, fs.SearchPath(c+"/"+s)));
+    o.push( await cb(gitCtx, fs,c + "/" + s, fs.SearchPath(c+"/"+s).id));
     
   }
   return o;
@@ -468,30 +469,39 @@ const GitPanel: React.FC = () => {
   let ec = useEditorContext()
   let mc = useMemoryContext();
   let db = IDB.useIDB();
+  let [availability,SetAv] = useState(true);
   const handlePush = async () => {
     // TODO: Implement push functionality
+    console.log("trying to push");
+    debugger;
     if ( !db || !ec || !mc || !mc.projectName || !mc.langType) return;
   
     let ghToken = await getOrCreateGithubToken(await db.ensureDB());
     let emu = await fs.emulator;
     let f = emu.emulator.fs9p;
-    
+    let [uname, pname] = [await ec.getUserName(mc.projectName), await ec.getRepoName(mc.projectName)]
+    console.log(`Username: ${uname} and reponame ${pname}`);
     console.log(await craftTree({
       ghApiToken: ghToken as string,
-      owner:  await ec.getUserName(mc.projectName),
-      repo: await ec.getRepoName(mc.projectName)
-    },f,ct));
+      owner:  uname,
+      repo: pname
+    },f,ct,'/'+mc.projectName));
   };
   
   const handlePull = () => {
     // TODO: Implement pull functionality
     alert('Pull clicked');
   };
-
+  useEffect(()=>{
+    (async()=>{
+      await fs.emulator;
+      SetAv(false);
+    })()
+  },[]);
   return (
     <div style={{ display: 'flex', gap: '1rem', margin: '1rem 0', flexDirection: 'column' }}>
-      <Button onPress={handlePush} style={{ padding: '0.5rem 1rem' }}>Push</Button>
-      <Button onPress={handlePull} style={{ padding: '0.5rem 1rem' }}>Pull</Button>
+      <Button onPress={handlePush} style={{ padding: '0.5rem 1rem' }} isDisabled={availability}>Push</Button>
+      <Button onPress={handlePull} style={{ padding: '0.5rem 1rem' }} isDisabled={availability}>Pull</Button>
     </div>
   );
 };
