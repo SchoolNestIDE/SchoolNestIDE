@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
 import { Edit3, Play, Trash2, Plus, Download, Upload, Loader, Search, Terminal, Code } from 'lucide-react';
-import {IconCode} from '@tabler/icons-react';
+import { IconCode, IconFolder, IconBrandGithub} from '@tabler/icons-react';
 import dynamic from 'next/dynamic';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
@@ -21,6 +21,8 @@ declare global {
 interface File {
   filename: string;
   contents: string;
+  isFolder?: boolean;
+  parentFolder?: string;
 }
 
 // Add these ABOVE the PythonIDE component
@@ -31,10 +33,10 @@ const STORE_NAME = 'projects';
 const openDB = () => {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-    
+
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
-    
+
     request.onupgradeneeded = (event) => {
       // @ts-ignore
       const db = event.target.result;
@@ -119,6 +121,8 @@ print(f"Word count: {len(text.split())}")
   const editorRef = useRef<any>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [project, setProject] = useState<any>(null);
+  const [draggedFile, setDraggedFile] = useState<string | null>(null);
+  const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
 
 
   // Common packages that work well with Pyodide
@@ -139,7 +143,7 @@ print(f"Word count: {len(text.split())}")
   useEffect(() => {
     const loadProject = async () => {
       if (!projectId) return;
-      
+
       try {
         const projectData = await getProject(projectId);
         if (projectData) {
@@ -166,14 +170,14 @@ print(f"Word count: {len(text.split())}")
   useEffect(() => {
     const saveProjectData = async () => {
       if (!project || !projectId) return;
-      
+
       const updatedProject = {
         ...project,
         files,
         installedPackages,
         lastModified: new Date().toISOString()
       };
-      
+
       await saveProject(updatedProject);
       setProject(updatedProject);
     };
@@ -184,32 +188,32 @@ print(f"Word count: {len(text.split())}")
 
 
   useEffect(() => {
-  const loadPyodide = async () => {
-    try {
-      setOutputLines(['Initializing Python runtime...']);
-      setLoadingProgress('Loading Pyodide...');
+    const loadPyodide = async () => {
+      try {
+        setOutputLines(['Initializing Python runtime...']);
+        setLoadingProgress('Loading Pyodide...');
 
-      // Check if script already exists
-      if (!document.querySelector('script[src*="pyodide"]')) {
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js';
+        // Check if script already exists
+        if (!document.querySelector('script[src*="pyodide"]')) {
+          const script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js';
 
-        script.onload = async () => {
-          try {
-            setLoadingProgress('Initializing Python environment...');
+          script.onload = async () => {
+            try {
+              setLoadingProgress('Initializing Python environment...');
 
-            window.pyodide = await window.loadPyodide({
-              indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/',
-              stdout: (text) => {
-                setOutputLines(prev => [...prev, text]);
-              },
-              stderr: (text) => {
-                setOutputLines(prev => [...prev, `Error: ${text}`]);
-              }
-            });
+              window.pyodide = await window.loadPyodide({
+                indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/',
+                stdout: (text) => {
+                  setOutputLines(prev => [...prev, text]);
+                },
+                stderr: (text) => {
+                  setOutputLines(prev => [...prev, `Error: ${text}`]);
+                }
+              });
 
-            // Setup Python output capture
-            await window.pyodide.runPython(`
+              // Setup Python output capture
+              await window.pyodide.runPython(`
 import sys
 import io
 from contextlib import redirect_stdout, redirect_stderr
@@ -237,55 +241,55 @@ class OutputCapture:
 output_capture = OutputCapture()
 `);
 
-            setPyodideLoaded(true);
+              setPyodideLoaded(true);
+              setLoadingProgress('');
+              setOutputLines(prev => [...prev, 'Python runtime loaded', 'Ready to execute', '']);
+
+            } catch (error) {
+              console.error('Error initializing Pyodide:', error);
+              setLoadingProgress('');
+              //@ts-ignore
+              setOutputLines([`Failed to initialize Python runtime: ${error.message}`]);
+            }
+          };
+
+          script.onerror = (error) => {
+            console.error('Script loading error:', error);
             setLoadingProgress('');
-            setOutputLines(prev => [...prev, 'Python runtime loaded', 'Ready to execute', '']);
+            setOutputLines(['Failed to load Pyodide script']);
+          };
 
-          } catch (error) {
-            console.error('Error initializing Pyodide:', error);
-            setLoadingProgress('');
-            //@ts-ignore
-            setOutputLines([`Failed to initialize Python runtime: ${error.message}`]);
-          }
-        };
-
-        script.onerror = (error) => {
-          console.error('Script loading error:', error);
-          setLoadingProgress('');
-          setOutputLines(['Failed to load Pyodide script']);
-        };
-
-        document.head.appendChild(script);
+          document.head.appendChild(script);
+        }
+      } catch (error) {
+        console.error('Error loading Pyodide:', error);
+        setLoadingProgress('');
+        //@ts-ignore
+        setOutputLines([`Error loading Python runtime: ${error.message}`]);
       }
-    } catch (error) {
-      console.error('Error loading Pyodide:', error);
-      setLoadingProgress('');
-      //@ts-ignore
-      setOutputLines([`Error loading Python runtime: ${error.message}`]);
-    }
-  };
+    };
 
-  loadPyodide();
-}, []);
+    loadPyodide();
+  }, []);
 
-// Restore packages when both Pyodide is loaded and packages are available
-useEffect(() => {
-  const restorePackages = async () => {
-    if (!pyodideLoaded || !window.pyodide || installedPackages.length === 0) return;
+  // Restore packages when both Pyodide is loaded and packages are available
+  useEffect(() => {
+    const restorePackages = async () => {
+      if (!pyodideLoaded || !window.pyodide || installedPackages.length === 0) return;
 
-    setOutputLines(prev => [...prev, 'Restoring installed packages...']);
-    for (const pkg of installedPackages) {
-      try {
-        await window.pyodide.loadPackage(pkg);
-        setOutputLines(prev => [...prev, `Restored ${pkg}`]);
-      } catch (error) {//@ts-ignore
-        setOutputLines(prev => [...prev, `Failed to restore ${pkg}: ${error.message}`]);
+      setOutputLines(prev => [...prev, 'Restoring installed packages...']);
+      for (const pkg of installedPackages) {
+        try {
+          await window.pyodide.loadPackage(pkg);
+          setOutputLines(prev => [...prev, `Restored ${pkg}`]);
+        } catch (error) {//@ts-ignore
+          setOutputLines(prev => [...prev, `Failed to restore ${pkg}: ${error.message}`]);
+        }
       }
-    }
-  };
+    };
 
-  restorePackages();
-}, [pyodideLoaded, installedPackages]);
+    restorePackages();
+  }, [pyodideLoaded, installedPackages]);
 
   const handleEditorDidMount = (editor: any) => {
     editorRef.current = editor;
@@ -383,7 +387,25 @@ print("Hello from ${newFileName}!")
 
     setFiles([...files, newFile]);
     setActiveFile(newFileName);
-    
+
+  };
+
+  const addFolder = () => {
+    let baseName = 'folder';
+    let counter = 1;
+
+    while (files.some(f => f.filename === `${baseName}${counter}` && f.isFolder)) {
+      counter++;
+    }
+
+    const newFolderName = `${baseName}${counter}`;
+    const newFolder = {
+      filename: newFolderName,
+      contents: '',
+      isFolder: true,
+    };
+
+    setFiles([...files, newFolder]);
   };
 
 
@@ -403,7 +425,10 @@ print("Hello from ${newFileName}!")
   };
 
   const renameFile = (oldFileName: string, newFileName: string) => {
-    if (!newFileName.endsWith('.py')) {
+    const file = files.find(f => f.filename === oldFileName);
+
+    // Only append .py for actual files, not folders
+    if (!file?.isFolder && !newFileName.endsWith('.py')) {
       newFileName += '.py';
     }
 
@@ -530,6 +555,38 @@ print("Hello from ${newFileName}!")
     document.body.style.userSelect = 'auto';
   };
 
+  const handleDragStart = (e: React.DragEvent, filename: string) => {
+    setDraggedFile(filename);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, folderName?: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (folderName) {
+      setDragOverFolder(folderName);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverFolder(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetFolder?: string) => {
+    e.preventDefault();
+    setDragOverFolder(null);
+
+    if (!draggedFile) return;
+
+    const updatedFiles = files.map(f =>
+      f.filename === draggedFile
+        ? { ...f, parentFolder: targetFolder }
+        : f
+    );
+    setFiles(updatedFiles);
+    setDraggedFile(null);
+  };
+
   return (
     <div className="rounded-md flex flex-col md:flex-row bg-black w-full flex-1 border border-slate-800 overflow-hidden h-screen">
       {/* Sidebar */}
@@ -554,13 +611,17 @@ print("Hello from ${newFileName}!")
                     <div className="flex items-center space-x-2">
                       <button
                         className={`flex-1 text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center space-x-3 border ${activeFile === file.filename
-                            ? "bg-[#4a6741]/50 text-slate-200 border-slate-700"
-                            : "text-neutral-400 hover:bg-neutral-800 border-transparent hover:border-neutral-700"
+                          ? "bg-[#4a6741]/50 text-slate-200 border-slate-700"
+                          : "text-neutral-400 hover:bg-neutral-800 border-transparent hover:border-neutral-700"
                           }`}
                         onClick={() => setActiveFile(file.filename)}
                       >
                         <div className="w-8 h-8 bg-[#4a6741] rounded-lg flex items-center justify-center shadow-sm">
-                          <IconCode className="h-4 w-4 text-white" />
+                          {file.isFolder ? (
+                            <Search className="h-4 w-4 text-white" />
+                          ) : (
+                            <IconCode className="h-4 w-4 text-white" />
+                          )}
                         </div>
                         <span className="font-mono text-sm font-medium truncate flex-1">
                           {file.filename}
@@ -606,6 +667,14 @@ print("Hello from ${newFileName}!")
               </button>
 
               <button
+                className="rounded-lg py-3 px-4 bg-[#304529] hover:bg-[#4a6741] text-white font-medium transition-all duration-200 border border-slate-700 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
+                onClick={addFolder}
+              >
+                <IconFolder className="w-4 h-4" />
+                <span className="text-sm">Folder</span>
+              </button>
+
+              <button
                 onClick={runCode}
                 disabled={!pyodideLoaded || isRunning}
                 className="rounded-lg py-3 px-4 bg-[#304529] hover:bg-[#4a6741] text-white font-medium transition-all duration-200 border border-slate-700 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
@@ -616,6 +685,13 @@ print("Hello from ${newFileName}!")
                   <Play className="w-4 h-4" />
                 )}
                 <span className="text-sm">{isRunning ? 'Running...' : 'Run Code'}</span>
+              </button>
+
+              <button
+                className="rounded-lg py-3 px-4 bg-[#304529] hover:bg-[#4a6741] text-white font-medium transition-all duration-200 border border-slate-700 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
+              >
+                <IconBrandGithub className="w-4 h-4" />
+                <span className="text-sm">Git</span>
               </button>
 
               <button
