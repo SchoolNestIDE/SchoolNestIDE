@@ -29,9 +29,8 @@ import { cn } from "@/app/lib/utils";
 import React, { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useSearchParams } from "next/navigation";
-import {Code, Edit3, Play, Trash2} from "lucide-react";
+import { Code, Edit3, Play, Trash2 } from "lucide-react";
 
-// Import MonacoEditor to avoid SSR issues
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
 declare global {
@@ -55,7 +54,6 @@ interface Project {
   files: File[];
 }
 
-// IndexedDB Configuration (copied from ProjectManager)
 const DB_NAME = 'JavaProjectsDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'projects';
@@ -63,10 +61,10 @@ const STORE_NAME = 'projects';
 const openDB = () => {
   return new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-    
+
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
-    
+
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
@@ -214,11 +212,10 @@ public class CustomFileInputStream extends InputStream {
   const [loading, setLoading] = useState(true);
   const [outputHeight, setOutputHeight] = useState(200);
 
-  // Load project from IndexedDB
   useEffect(() => {
     const loadProject = async () => {
       if (!projectId) return;
-      
+
       try {
         const project = await getProject(projectId);
         setProjectData(project);
@@ -234,16 +231,15 @@ public class CustomFileInputStream extends InputStream {
     loadProject();
   }, [projectId]);
 
-  // Save project to IndexedDB
   const saveProjectToDB = async () => {
     if (!projectData) return;
-    
+
     const updatedProject: Project = {
       ...projectData,
       files: files.filter(f => f.filename !== 'CustomFileInputStream.java'),
       lastModified: new Date().toISOString()
     };
-    
+
     try {
       await saveProject(updatedProject);
       setProjectData(updatedProject);
@@ -274,7 +270,6 @@ public class CustomFileInputStream extends InputStream {
     reader.readAsText(file);
   };
 
-  // Load WASM compiler
   useEffect(() => {
     const loadCheerpJ = async () => {
       try {
@@ -478,12 +473,12 @@ public class CustomFileInputStream extends InputStream {
       const sourceFiles = filesToCompile.map(file => '/str/' + file.filename);
       const classPath = '/app/tools.jar:/files/';
       const code = await window.cheerpjRunMain(
-          'com.sun.tools.javac.Main',
-          classPath,
-          ...sourceFiles,
-          '-d',
-          '/files/',
-          '-Xlint'
+        'com.sun.tools.javac.Main',
+        classPath,
+        ...sourceFiles,
+        '-d',
+        '/files/',
+        '-Xlint'
       );
 
       if (code !== 0) {
@@ -494,9 +489,9 @@ public class CustomFileInputStream extends InputStream {
       setOutputLines((prev) => [...prev, `Running ${activeFile}...`]);
 
       await window.cheerpjRunMain(
-          'CustomFileInputStream',
-          classPath,
-          activeClassName
+        'CustomFileInputStream',
+        classPath,
+        activeClassName
       );
 
     } catch (error: any) {
@@ -511,11 +506,11 @@ public class CustomFileInputStream extends InputStream {
   const handleEditorChange = (value: string | undefined) => {
     if (!value) return;
     setFiles(prev =>
-        prev.map(file =>
-            file.filename === activeFile
-                ? { ...file, contents: value }
-                : file
-        )
+      prev.map(file =>
+        file.filename === activeFile
+          ? { ...file, contents: value }
+          : file
+      )
     );
   };
 
@@ -559,9 +554,9 @@ public class CustomFileInputStream extends InputStream {
       return;
     }
     const updatedFiles = files.map(f =>
-        f.filename === oldFileName
-            ? { ...f, filename: newFileName }
-            : f
+      f.filename === oldFileName
+        ? { ...f, filename: newFileName }
+        : f
     );
     setFiles(updatedFiles);
     if (activeFile === oldFileName) {
@@ -619,30 +614,30 @@ public class CustomFileInputStream extends InputStream {
 
   const Logo = () => {
     return (
-        <Link
-            href="/"
-            className="font-normal flex space-x-2 items-center text-sm text-white py-1 relative z-20"
+      <Link
+        href="/"
+        className="font-normal flex space-x-2 items-center text-sm text-white py-1 relative z-20"
+      >
+        <div className="h-6 w-6 bg-[#6A4028] rounded-lg shadow-lg shadow-[#6A4028]/30 flex-shrink-0" />
+        <motion.span
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="font-semibold text-white whitespace-pre bg-gradient-to-r from-[#6A4028] to-white bg-clip-text text-transparent"
         >
-          <div className="h-6 w-6 bg-[#6A4028] rounded-lg shadow-lg shadow-[#6A4028]/30 flex-shrink-0" />
-          <motion.span
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="font-semibold text-white whitespace-pre bg-gradient-to-r from-[#6A4028] to-white bg-clip-text text-transparent"
-          >
-            SchoolNest
-          </motion.span>
-        </Link>
+          SchoolNest
+        </motion.span>
+      </Link>
     );
   };
 
   const LogoIcon = () => {
     return (
-        <Link
-            href="#"
-            className="font-normal flex space-x-2 items-center text-sm text-white py-1 relative z-20"
-        >
-          <div className="h-6 w-6 bg-[#6A4028] rounded-lg shadow-lg shadow-[#6A4028]/30 flex-shrink-0" />
-        </Link>
+      <Link
+        href="#"
+        className="font-normal flex space-x-2 items-center text-sm text-white py-1 relative z-20"
+      >
+        <div className="h-6 w-6 bg-[#6A4028] rounded-lg shadow-lg shadow-[#6A4028]/30 flex-shrink-0" />
+      </Link>
     );
   };
 
@@ -651,49 +646,49 @@ public class CustomFileInputStream extends InputStream {
       label: "Home",
       href: "/studenthome/",
       icon: (
-          <IconBrandTabler className="text-slate-400 h-5 w-5 flex-shrink-0" />
+        <IconBrandTabler className="text-slate-400 h-5 w-5 flex-shrink-0" />
       ),
     },
     {
       label: "Profile",
       href: "#",
       icon: (
-          <IconUserBolt className="text-slate-400 h-5 w-5 flex-shrink-0" />
+        <IconUserBolt className="text-slate-400 h-5 w-5 flex-shrink-0" />
       ),
     },
     {
       label: "Dashboard",
       href: "/studenthome/java",
       icon: (
-          <IconCoffee className="text-slate-400 h-5 w-5 flex-shrink-0" />
+        <IconCoffee className="text-slate-400 h-5 w-5 flex-shrink-0" />
       ),
     },
     {
       label: "Dependencies",
       href: "/studenthome/java/dependencies",
       icon: (
-          <IconPackage className="text-slate-400 h-5 w-5 flex-shrink-0" />
+        <IconPackage className="text-slate-400 h-5 w-5 flex-shrink-0" />
       ),
     },
     {
       label: "Templates",
       href: "/studenthome/java/templates",
       icon: (
-          <IconTemplate className="text-slate-400 h-5 w-5 flex-shrink-0" />
+        <IconTemplate className="text-slate-400 h-5 w-5 flex-shrink-0" />
       ),
     },
     {
       label: "Account Settings",
       href: "#",
       icon: (
-          <IconSettings className="text-slate-400 h-5 w-5 flex-shrink-0" />
+        <IconSettings className="text-slate-400 h-5 w-5 flex-shrink-0" />
       ),
     },
     {
       label: "Logout",
       href: "",
       icon: (
-          <IconArrowLeft className="text-slate-400 h-5 w-5 flex-shrink-0" />
+        <IconArrowLeft className="text-slate-400 h-5 w-5 flex-shrink-0" />
       ),
     },
   ];
@@ -710,251 +705,249 @@ public class CustomFileInputStream extends InputStream {
   }
 
   return (
+    <div
+      className={cn(
+        "rounded-md flex flex-col md:flex-row bg-black w-full flex-1 border border-slate-800 overflow-auto",
+        "h-screen"
+      )}
+    >
+      <Sidebar open={open} setOpen={setOpen}>
+        <SidebarBody className="justify-between gap-10 bg-slate-900">
+          <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden ml-1 mb-2 pb-6">
+            {open ? <Logo /> : <LogoIcon />}
+
+            <div className="mt-8 flex flex-col gap-2">
+              {links.map((link, idx) => (
+                <SidebarLink key={idx} link={link} />
+              ))}
+            </div>
+          </div>
+        </SidebarBody>
+      </Sidebar>
+
       <div
-          className={cn(
-              "rounded-md flex flex-col md:flex-row bg-black w-full flex-1 border border-slate-800 overflow-auto",
-              "h-screen"
-          )}
+        className="border-r border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 backdrop-blur-xl flex flex-col"
+        style={{ width: sidebarWidth }}
       >
-        <Sidebar open={open} setOpen={setOpen}>
-          <SidebarBody className="justify-between gap-10 bg-slate-900">
-            <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden ml-1 mb-2 pb-6">
-              {open ? <Logo /> : <LogoIcon />}
+        <div className="p-6 -mt-2 h-full flex flex-col overflow-hidden">
+          <div className="mb-4 flex-shrink-0 font-bold flex items-center gap-2">
+            Java IDE
+            {projectData && (
+              <span className="text-sm font-normal text-neutral-500 ml-2 truncate">
+                {projectData.name}
+              </span>
+            )}
+          </div>
 
-              <div className="mt-8 flex flex-col gap-2">
-                {links.map((link, idx) => (
-                    <SidebarLink key={idx} link={link} />
-                ))}
-              </div>
-            </div>
-          </SidebarBody>
-        </Sidebar>
-
-        <div
-            className="border-r border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 backdrop-blur-xl flex flex-col"
-            style={{ width: sidebarWidth }}
-        >
-          <div className="p-6 -mt-2 h-full flex flex-col overflow-hidden">
-            <div className="mb-4 flex-shrink-0 font-bold flex items-center gap-2">
-              Java IDE
-              {projectData && (
-                <span className="text-sm font-normal text-neutral-500 ml-2 truncate">
-                  {projectData.name}
-                </span>
-              )}
-            </div>
-
-            <div
-                className="flex-1 overflow-y-auto space-y-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-[#9C6F52] dark:scrollbar-thumb-[#6A4028] hover:scrollbar-thumb-[#D4B08D] dark:hover:scrollbar-thumb-[#9C6F52] scrollbar-thumb-rounded-full pb-4"
-                style={{ marginTop: '-12px' }}
-            >
-              <div className="relative group">
-                <button
-                    className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center space-x-3 border ${
-                        activeFile === "Main.java"
-                            ? "bg-[#F5E8D9] dark:bg-[#3d2a1b] text-[#6A4028] dark:text-[#e2b48c] border-[#d4b08d] dark:border-[#6A4028] shadow-sm"
-                            : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 border-transparent hover:border-neutral-200 dark:hover:border-neutral-700"
-                    }`}
-                    onClick={() => setActiveFile("Main.java")}
-                >
-                  <div className="w-8 h-8 bg-[#6A4028] rounded-lg flex items-center justify-center shadow-sm">
-                    <IconCode className="h-4 w-4 text-white" />
-                  </div>
-                  <div className="flex flex-col flex-1 min-w-0">
-                    <span className="font-mono text-sm font-medium truncate">Main.java</span>
-                    {activeFile === "Main.java"}
-                  </div>
-                </button>
-              </div>
-
-              {files
-                  .filter(
-                      (file) =>
-                          file.filename !== "Main.java" &&
-                          file.filename !== "CustomFileInputStream.java"
-                  )
-                  .map((file) => (
-                      <div key={file.filename} className="relative group">
-                        <div className="flex items-center space-x-2">
-                          <button
-                              className={`flex-1 text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center space-x-3 border ${
-                                  activeFile === file.filename
-                                      ? "bg-[#F5E8D9] dark:bg-[#3d2a1b] text-[#6A4028] dark:text-[#e2b48c] border-[#d4b08d] dark:border-[#6A4028] shadow-sm"
-                                      : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 border-transparent hover:border-neutral-200 dark:hover:border-neutral-700"
-                              }`}
-                              onClick={() => setActiveFile(file.filename)}
-                          >
-                            <div className="w-8 h-8 bg-[#6A4028] rounded-lg flex items-center justify-center shadow-sm">
-                              <Code className="h-4 w-4 text-white" />
-                            </div>
-                            <span className="font-mono text-sm font-medium truncate flex-1">
-                  {file.filename}
-                </span>
-                          </button>
-
-                          <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                            <button
-                                onClick={() => {
-                                  const newFileName = prompt("Enter new file name", file.filename);
-                                  if (newFileName && newFileName !== file.filename) {
-                                    renameFile(file.filename, newFileName);
-                                  }
-                                }}
-                                className="p-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-[#F5E8D9] dark:hover:bg-[#3d2a1b] rounded-lg transition-all duration-200 border border-neutral-200 dark:border-neutral-700 hover:border-[#d4b08d] dark:hover:border-[#6A4028]"
-                                title="Rename file"
-                            >
-                              <Edit3 className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400 hover:text-[#6A4028] dark:hover:text-[#D4B08D]" />
-                            </button>
-                            <button
-                                onClick={() => removeFile(file.filename)}
-                                className="p-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-all duration-200 border border-neutral-200 dark:border-neutral-700 hover:border-red-300 dark:hover:border-red-600"
-                                title="Delete file"
-                            >
-                              <IconTrash className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400 hover:text-red-600 dark:hover:text-red-400" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                  ))}
-            </div>
-
-            <div className="space-y-4 flex-shrink-0">
-              <div className="flex  items-center space-x-2 mb-4">
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                    className="rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
-                    onClick={addFile}
-                    disabled={!cheerpjLoaded}
-                >
-                  <IconFileDownload className="w-4 h-4" />
-                  <span className="text-sm">Add File</span>
-                </button>
-
-                <button
-                    className="rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
-                    onClick={runCode}
-                    disabled={!cheerpjLoaded}
-                >
-                  <IconPlayerPlayFilled className="w-4 h-4" />
-                  <span className="text-sm">Run File</span>
-                </button>
-
-                <button
-                    className="rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
-                    onClick={handleExport}
-                    disabled={!cheerpjLoaded}
-                >
-                  <IconFolderDown className="w-4 h-4" />
-                  <span className="text-sm">Export</span>
-                </button>
-
-                <label className="rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium cursor-pointer transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 flex items-center justify-center space-x-2 active:scale-[0.98]">
-                  <IconUpload className="w-4 h-4" />
-                  <span className="text-sm">Load</span>
-                  <input
-                      type="file"
-                      accept=".java"
-                      onChange={handleFileUpload}
-                      disabled={!cheerpjLoaded}
-                      className="hidden"
-                  />
-                </label>
-              </div>
-
-              {/* Save button */}
+          <div
+            className="flex-1 overflow-y-auto space-y-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-[#9C6F52] dark:scrollbar-thumb-[#6A4028] hover:scrollbar-thumb-[#D4B08D] dark:hover:scrollbar-thumb-[#9C6F52] scrollbar-thumb-rounded-full pb-4"
+            style={{ marginTop: '-12px' }}
+          >
+            <div className="relative group">
               <button
-                  className="w-full rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium cursor-pointer transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 flex items-center justify-center space-x-2 active:scale-[0.98]"
-                  onClick={saveProjectToDB}
-                  disabled={!cheerpjLoaded}
+                className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center space-x-3 border ${activeFile === "Main.java"
+                    ? "bg-[#F5E8D9] dark:bg-[#3d2a1b] text-[#6A4028] dark:text-[#e2b48c] border-[#d4b08d] dark:border-[#6A4028] shadow-sm"
+                    : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 border-transparent hover:border-neutral-200 dark:hover:border-neutral-700"
+                  }`}
+                onClick={() => setActiveFile("Main.java")}
               >
-                  <IconDeviceFloppy className="w-4 h-4" />
-                  <span className="text-sm">Save Project</span>
+                <div className="w-8 h-8 bg-[#6A4028] rounded-lg flex items-center justify-center shadow-sm">
+                  <IconCode className="h-4 w-4 text-white" />
+                </div>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <span className="font-mono text-sm font-medium truncate">Main.java</span>
+                  {activeFile === "Main.java"}
+                </div>
               </button>
+            </div>
 
-              {!cheerpjLoaded && (
-                  <div className="mt-4 p-4 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <IconLoader className="h-4 w-4 text-[#6A4028] animate-spin" />
-                      <span className="text-neutral-600 dark:text-neutral-400 text-sm font-medium">Loading Java Compiler...</span>
+            {files
+              .filter(
+                (file) =>
+                  file.filename !== "Main.java" &&
+                  file.filename !== "CustomFileInputStream.java"
+              )
+              .map((file) => (
+                <div key={file.filename} className="relative group">
+                  <div className="flex items-center space-x-2">
+                    <button
+                      className={`flex-1 text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center space-x-3 border ${activeFile === file.filename
+                          ? "bg-[#F5E8D9] dark:bg-[#3d2a1b] text-[#6A4028] dark:text-[#e2b48c] border-[#d4b08d] dark:border-[#6A4028] shadow-sm"
+                          : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 border-transparent hover:border-neutral-200 dark:hover:border-neutral-700"
+                        }`}
+                      onClick={() => setActiveFile(file.filename)}
+                    >
+                      <div className="w-8 h-8 bg-[#6A4028] rounded-lg flex items-center justify-center shadow-sm">
+                        <Code className="h-4 w-4 text-white" />
+                      </div>
+                      <span className="font-mono text-sm font-medium truncate flex-1">
+                        {file.filename}
+                      </span>
+                    </button>
+
+                    <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <button
+                        onClick={() => {
+                          const newFileName = prompt("Enter new file name", file.filename);
+                          if (newFileName && newFileName !== file.filename) {
+                            renameFile(file.filename, newFileName);
+                          }
+                        }}
+                        className="p-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-[#F5E8D9] dark:hover:bg-[#3d2a1b] rounded-lg transition-all duration-200 border border-neutral-200 dark:border-neutral-700 hover:border-[#d4b08d] dark:hover:border-[#6A4028]"
+                        title="Rename file"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400 hover:text-[#6A4028] dark:hover:text-[#D4B08D]" />
+                      </button>
+                      <button
+                        onClick={() => removeFile(file.filename)}
+                        className="p-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-all duration-200 border border-neutral-200 dark:border-neutral-700 hover:border-red-300 dark:hover:border-red-600"
+                        title="Delete file"
+                      >
+                        <IconTrash className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400 hover:text-red-600 dark:hover:text-red-400" />
+                      </button>
                     </div>
                   </div>
-              )}
-            </div>
+                </div>
+              ))}
           </div>
-        </div>
 
-        <div
-            className="w-1 h-full bg-neutral-300 dark:bg-neutral-600 cursor-col-resize hover:bg-[#6A4028] dark:hover:bg-[#6A4028] transition-all duration-200"
-            onMouseDown={handleMouseDown}
-        />
-        <div className="flex-1 flex flex-col min-w-0">
-          <div className='bg-[#1E1E1E]'>
-            <p
-              className='ml-2 font-mono '
-              style={{
-                fontFamily: 'monospace',
-              }}
+          <div className="space-y-4 flex-shrink-0">
+            <div className="flex  items-center space-x-2 mb-4">
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                className="rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
+                onClick={addFile}
+                disabled={!cheerpjLoaded}
+              >
+                <IconFileDownload className="w-4 h-4" />
+                <span className="text-sm">Add File</span>
+              </button>
+
+              <button
+                className="rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
+                onClick={runCode}
+                disabled={!cheerpjLoaded}
+              >
+                <IconPlayerPlayFilled className="w-4 h-4" />
+                <span className="text-sm">Run File</span>
+              </button>
+
+              <button
+                className="rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
+                onClick={handleExport}
+                disabled={!cheerpjLoaded}
+              >
+                <IconFolderDown className="w-4 h-4" />
+                <span className="text-sm">Export</span>
+              </button>
+
+              <label className="rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium cursor-pointer transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 flex items-center justify-center space-x-2 active:scale-[0.98]">
+                <IconUpload className="w-4 h-4" />
+                <span className="text-sm">Load</span>
+                <input
+                  type="file"
+                  accept=".java"
+                  onChange={handleFileUpload}
+                  disabled={!cheerpjLoaded}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {/* Save button */}
+            <button
+              className="w-full rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium cursor-pointer transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 flex items-center justify-center space-x-2 active:scale-[0.98]"
+              onClick={saveProjectToDB}
+              disabled={!cheerpjLoaded}
             >
-              {activeFile}
-            </p>
-          </div>
-          <div className="flex-1">
-            <MonacoEditor
-              language="java"
-              theme="vs-dark"
-              value={
-                files.find((f) => f.filename === activeFile)?.contents ?? ""
-              }
-              onChange={handleEditorChange}
-              options={{ automaticLayout: true }}
-              onMount={handleEditorDidMount}
-            />
-          </div>
-          <div
-            style={{
-              height: '5px',
-              cursor: 'row-resize',
-              backgroundColor: '#ccc',
-            }}
-          />
+              <IconDeviceFloppy className="w-4 h-4" />
+              <span className="text-sm">Save Project</span>
+            </button>
 
-          <div
-            style={{
-              height: '200px',
-              borderTop: '1px solid #ccc',
-              backgroundColor: '#1e1e1e',
-              color: 'white',
-              fontFamily: 'monospace',
-              padding: '10px',
-              overflowY: 'auto',
-            }}
-            ref={outputRef}
-          >
-            {outputLines.map((line, index) => (
-              <div key={index}>{line}</div>
-
-            ))}
-            <div style={{ display: 'flex' }}>
-              &gt;&nbsp;
-              <input
-                type="text"
-                ref={inputFieldRef}
-                disabled
-                style={{
-                  width: '100%',
-                  backgroundColor: 'transparent',
-                  color: 'white',
-                  border: 'none',
-                  outline: 'none',
-                  fontFamily: 'monospace',
-                }}
-              />
-            </div>
+            {!cheerpjLoaded && (
+              <div className="mt-4 p-4 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <IconLoader className="h-4 w-4 text-[#6A4028] animate-spin" />
+                  <span className="text-neutral-600 dark:text-neutral-400 text-sm font-medium">Loading Java Compiler...</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      <div
+        className="w-1 h-full bg-neutral-300 dark:bg-neutral-600 cursor-col-resize hover:bg-[#6A4028] dark:hover:bg-[#6A4028] transition-all duration-200"
+        onMouseDown={handleMouseDown}
+      />
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className='bg-[#1E1E1E]'>
+          <p
+            className='ml-2 font-mono '
+            style={{
+              fontFamily: 'monospace',
+            }}
+          >
+            {activeFile}
+          </p>
+        </div>
+        <div className="flex-1">
+          <MonacoEditor
+            language="java"
+            theme="vs-dark"
+            value={
+              files.find((f) => f.filename === activeFile)?.contents ?? ""
+            }
+            onChange={handleEditorChange}
+            options={{ automaticLayout: true }}
+            onMount={handleEditorDidMount}
+          />
+        </div>
+        <div
+          style={{
+            height: '5px',
+            cursor: 'row-resize',
+            backgroundColor: '#ccc',
+          }}
+        />
+
+        <div
+          style={{
+            height: '200px',
+            borderTop: '1px solid #ccc',
+            backgroundColor: '#1e1e1e',
+            color: 'white',
+            fontFamily: 'monospace',
+            padding: '10px',
+            overflowY: 'auto',
+          }}
+          ref={outputRef}
+        >
+          {outputLines.map((line, index) => (
+            <div key={index}>{line}</div>
+
+          ))}
+          <div style={{ display: 'flex' }}>
+            &gt;&nbsp;
+            <input
+              type="text"
+              ref={inputFieldRef}
+              disabled
+              style={{
+                width: '100%',
+                backgroundColor: 'transparent',
+                color: 'white',
+                border: 'none',
+                outline: 'none',
+                fontFamily: 'monospace',
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 

@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
 import { Edit3, Play, Trash2, Plus, Download, Upload, Loader, Search, Terminal, Code } from 'lucide-react';
-import { IconCode, IconFolder, IconBrandGithub} from '@tabler/icons-react';
+import { IconCode, IconFolder, IconBrandGithub } from '@tabler/icons-react';
 import dynamic from 'next/dynamic';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
@@ -25,7 +25,6 @@ interface File {
   parentFolder?: string;
 }
 
-// Add these ABOVE the PythonIDE component
 const DB_NAME = 'PythonProjectsDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'projects';
@@ -124,8 +123,6 @@ print(f"Word count: {len(text.split())}")
   const [draggedFile, setDraggedFile] = useState<string | null>(null);
   const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
 
-
-  // Common packages that work well with Pyodide
   const commonPackages = [
     'numpy', 'matplotlib', 'pandas', 'scipy', 'scikit-learn',
     'micropip', 'pytz', 'packaging', 'pillow', 'requests'
@@ -139,7 +136,6 @@ print(f"Word count: {len(text.split())}")
     }
   }, []);
 
-  // Fetch project data
   useEffect(() => {
     const loadProject = async () => {
       if (!projectId) return;
@@ -166,7 +162,6 @@ print(f"Word count: {len(text.split())}")
     loadProject();
   }, [projectId]);
 
-  // Save project on changes
   useEffect(() => {
     const saveProjectData = async () => {
       if (!project || !projectId) return;
@@ -193,7 +188,6 @@ print(f"Word count: {len(text.split())}")
         setOutputLines(['Initializing Python runtime...']);
         setLoadingProgress('Loading Pyodide...');
 
-        // Check if script already exists
         if (!document.querySelector('script[src*="pyodide"]')) {
           const script = document.createElement('script');
           script.src = 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js';
@@ -212,7 +206,6 @@ print(f"Word count: {len(text.split())}")
                 }
               });
 
-              // Setup Python output capture
               await window.pyodide.runPython(`
 import sys
 import io
@@ -272,7 +265,6 @@ output_capture = OutputCapture()
     loadPyodide();
   }, []);
 
-  // Restore packages when both Pyodide is loaded and packages are available
   useEffect(() => {
     const restorePackages = async () => {
       if (!pyodideLoaded || !window.pyodide || installedPackages.length === 0) return;
@@ -311,7 +303,6 @@ output_capture = OutputCapture()
     setOutputLines([`Running ${activeFile}`, '']);
 
     try {
-      // Execute code with output capture
       await window.pyodide.runPython(`
 try:
     stdout_redirect, stderr_redirect = output_capture.capture()
@@ -323,7 +314,6 @@ except Exception as e:
     traceback.print_exc()
 `);
 
-      // Get captured output
       const [stdout, stderr] = await window.pyodide.runPython('output_capture.get_output()');
 
       const outputToShow = [];
@@ -426,8 +416,6 @@ print("Hello from ${newFileName}!")
 
   const renameFile = (oldFileName: string, newFileName: string) => {
     const file = files.find(f => f.filename === oldFileName);
-
-    // Only append .py for actual files, not folders
     if (!file?.isFolder && !newFileName.endsWith('.py')) {
       newFileName += '.py';
     }
@@ -506,7 +494,6 @@ print("Hello from ${newFileName}!")
 
       setOutputLines(prev => [...prev, `Successfully installed ${packageName}`]);
 
-      // Add to installed packages list
       if (!installedPackages.includes(packageName)) {
         setInstalledPackages(prev => [...prev, packageName]);
       }
@@ -531,7 +518,6 @@ print("Hello from ${newFileName}!")
     setPackageInput('');
   };
 
-  // Resize handlers
   const handleMouseDown = (e: React.MouseEvent) => {
     isResizing.current = true;
     document.addEventListener('mousemove', handleMouseMove);

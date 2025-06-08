@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { 
-  IconPlus, 
-  IconFolder, 
-  IconTemplate, 
-  IconSchool, 
-  IconTrash, 
-  IconEdit, 
+import {
+  IconPlus,
+  IconFolder,
+  IconTemplate,
+  IconSchool,
+  IconTrash,
+  IconEdit,
   IconExternalLink,
   IconBrandPython,
   IconCode,
@@ -17,11 +17,7 @@ import {
   IconBrandGithub,
   IconChalkboard
 } from '@tabler/icons-react';
-// Remove this import line:
-// import { FloatingNav } from "@/app/components/ui/floating-navbar";
 import { BackgroundLines } from "@/app/components/ui/background-lines";
-
-// IndexedDB helper functions
 const DB_NAME = 'PythonProjectsDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'projects';
@@ -29,12 +25,12 @@ const STORE_NAME = 'projects';
 const openDB = () => {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-    
+
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
-    
+
     request.onupgradeneeded = (event) => {
-        //@ts-ignore
+      //@ts-ignore
       const db = event.target.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
@@ -74,7 +70,6 @@ const deleteProject = async (id) => {
   return store.delete(id);
 };
 
-// Template projects
 const templateProjects = [
   {
     id: 'template-hello-world',
@@ -187,7 +182,6 @@ if __name__ == "__main__":
   }
 ];
 
-// Mock class data
 const mockClasses = [
   { id: 1, name: "Algorithms Data AB", code: "CSA25", instructor: "Mr. Mark Estep" }
 ];
@@ -198,7 +192,7 @@ export default function ProjectManager() {
   const [newProjectName, setNewProjectName] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(''); // Added error state
+  const [error, setError] = useState('');
 
   useEffect(() => {
     loadProjects();
@@ -218,23 +212,21 @@ export default function ProjectManager() {
 
   const createProject = async (template = null) => {
     const trimmedName = newProjectName.trim();
-    
-    // Validate project name
+
     if (!trimmedName) {
       setError('Project name cannot be empty');
       return;
     }
-    
+
     if (trimmedName.length > 50) {
       setError('Project name must be 50 characters or less');
       return;
     }
-    
-    // Check for duplicate names
+
     const nameExists = projects.some(
       project => project.name.toLowerCase() === trimmedName.toLowerCase()
     );
-    
+
     if (nameExists) {
       setError('A project with this name already exists');
       return;
@@ -242,7 +234,7 @@ export default function ProjectManager() {
 
     const newProject = {
       id: `project-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name: trimmedName, // Use trimmed name
+      name: trimmedName,
       created: new Date().toISOString(),
       lastModified: new Date().toISOString(),
       files: template ? template.files : [
@@ -255,7 +247,7 @@ if __name__ == "__main__":
     main()`
         }
       ],
-      installedPackages: [] // Add package tracking
+      installedPackages: []
     };
 
     try {
@@ -263,7 +255,7 @@ if __name__ == "__main__":
       setProjects(prev => [newProject, ...prev]);
       setNewProjectName('');
       setSelectedTemplate(null);
-      setError(''); // Clear error on success
+      setError('');
       setShowCreateModal(false);
     } catch (error) {
       console.error('Error creating project:', error);
@@ -273,40 +265,39 @@ if __name__ == "__main__":
 
   const createFromTemplate = (template) => {
     setSelectedTemplate(template);
-    // Set initial name with template name but let user modify
     setNewProjectName(template.name);
     setShowCreateModal(true);
-    setError(''); // Clear previous errors
+    setError('');
   };
 
   const removeProject = async (projectId) => {
-  // Use window.confirm to ensure compatibility
-  const confirmed = window.confirm('Are you sure you want to delete this project? This action cannot be undone.');
-  
-  if (confirmed) {
-    try {
-      console.log('Attempting to delete project:', projectId); // Debug log
-      await deleteProject(projectId);
-      
-      // Update the state to remove the project from the UI
-      setProjects(prev => {
-        const updatedProjects = prev.filter(p => p.id !== projectId);
-        console.log('Projects after deletion:', updatedProjects.length); // Debug log
-        return updatedProjects;
-      });
-      
-      console.log('Project deleted successfully'); // Debug log
-    } catch (error) {
-      console.error('Error deleting project:', error);
-      // Show user-friendly error message
-      alert('Failed to delete project. Please try again.');
+
+    const confirmed = window.confirm('Are you sure you want to delete this project? This action cannot be undone.');
+
+    if (confirmed) {
+      try {
+        console.log('Attempting to delete project:', projectId);
+        await deleteProject(projectId);
+
+
+        setProjects(prev => {
+          const updatedProjects = prev.filter(p => p.id !== projectId);
+          console.log('Projects after deletion:', updatedProjects.length);
+          return updatedProjects;
+        });
+
+        console.log('Project deleted successfully');
+      } catch (error) {
+        console.error('Error deleting project:', error);
+
+        alert('Failed to delete project. Please try again.');
+      }
     }
-  }
-};
+  };
 
   const openIDE = (project) => {
-  window.open(`/studenthome/python/ide?projectId=${project.id}`, '_blank');
-};
+    window.open(`/studenthome/python/ide?projectId=${project.id}`, '_blank');
+  };
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -317,7 +308,7 @@ if __name__ == "__main__":
       minute: '2-digit'
     });
   };
-const dockLinks = [
+  const dockLinks = [
     {
       title: "Back Home",
       icon: <IconHome className="h-full w-full text-[#4F7942]" />,
@@ -350,7 +341,7 @@ const dockLinks = [
     <>
       {/* Remove this line to get rid of the floating nav bar: */}
       {/* <FloatingNav className="z-50" /> */}
-      
+
       <div className="pt-32 px-4 min-h-screen bg-neutral-950 text-white">
         <div className="max-w-7xl mx-auto">
           <div className="relative mb-12">
@@ -415,7 +406,7 @@ const dockLinks = [
                     )}
                   </div>
                 </div>
-                
+
                 <div className="p-6">
                   {projects.length === 0 ? (
                     <div className="text-center py-12">
@@ -447,7 +438,7 @@ const dockLinks = [
                               </p>
                             </div>
                           </div>
-                          
+
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => openIDE(project)}
@@ -458,11 +449,11 @@ const dockLinks = [
                             </button>
                             <button
                               onClick={(e) => {
-                                  e.stopPropagation();
-                                  removeProject(project.id);
+                                e.stopPropagation();
+                                removeProject(project.id);
                               }}
                               className="p-1.5 text-red-400 hover:bg-red-400/10 rounded transition-colors duration-300 hover:scale-105">
-                                  <IconTrash className="h-4 w-4" />
+                              <IconTrash className="h-4 w-4" />
                             </button>
                           </div>
                         </div>
@@ -483,7 +474,7 @@ const dockLinks = [
                     <h3 className="font-semibold text-white">Templates</h3>
                   </div>
                 </div>
-                
+
                 <div className="p-4 space-y-3">
                   {templateProjects.map((template) => (
                     <div
@@ -511,7 +502,7 @@ const dockLinks = [
                     <h3 className="font-semibold text-white">Your Classes</h3>
                   </div>
                 </div>
-                
+
                 <div className="p-4 space-y-3">
                   {mockClasses.map((classItem) => (
                     <div key={classItem.id} className="border border-neutral-700 rounded-lg p-3 hover:bg-neutral-700/60 transition-colors">
@@ -526,68 +517,68 @@ const dockLinks = [
           </div>
 
           {/* Create Project Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-neutral-800 rounded-lg max-w-md w-full p-6 border border-neutral-700 backdrop-blur-sm">
-            <h3 className="text-lg font-semibold text-white mb-4">
-              {selectedTemplate ? `Create from ${selectedTemplate.name}` : 'Create New Project'}
-            </h3>
-            
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-neutral-200 mb-2">
-                Project Name
-              </label>
-              <input
-                type="text"
-                value={newProjectName}
-                onChange={(e) => {
-                  setNewProjectName(e.target.value);
-                  setError(''); // Clear error when user types
-                }}
-                placeholder="Enter project name (max 50 characters)"
-                className="w-full px-3 py-2 bg-neutral-700/50 text-white border border-neutral-600 rounded-lg focus:ring-2 focus:ring-[#228B22] focus:border-transparent transition-colors"
-                autoFocus
-                maxLength={50} // Enforce max length in UI
-              />
-              {error && (
-                <p className="text-red-400 text-sm mt-2">{error}</p>
-              )}
-              <div className="text-right text-xs text-neutral-400 mt-1">
-                {newProjectName.length}/50 characters
+          {showCreateModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-neutral-800 rounded-lg max-w-md w-full p-6 border border-neutral-700 backdrop-blur-sm">
+                <h3 className="text-lg font-semibold text-white mb-4">
+                  {selectedTemplate ? `Create from ${selectedTemplate.name}` : 'Create New Project'}
+                </h3>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-neutral-200 mb-2">
+                    Project Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newProjectName}
+                    onChange={(e) => {
+                      setNewProjectName(e.target.value);
+                      setError('');
+                    }}
+                    placeholder="Enter project name (max 50 characters)"
+                    className="w-full px-3 py-2 bg-neutral-700/50 text-white border border-neutral-600 rounded-lg focus:ring-2 focus:ring-[#228B22] focus:border-transparent transition-colors"
+                    autoFocus
+                    maxLength={50}
+                  />
+                  {error && (
+                    <p className="text-red-400 text-sm mt-2">{error}</p>
+                  )}
+                  <div className="text-right text-xs text-neutral-400 mt-1">
+                    {newProjectName.length}/50 characters
+                  </div>
+                </div>
+
+                {selectedTemplate && (
+                  <div className="mb-4 p-3 bg-[#228B22]/20 border border-[#228B22]/30 rounded-lg">
+                    <p className="text-sm text-[#90EE90]">
+                      <strong>Template:</strong> {selectedTemplate.description}
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex gap-3 justify-end">
+                  <button
+                    onClick={() => {
+                      setShowCreateModal(false);
+                      setNewProjectName('');
+                      setSelectedTemplate(null);
+                      setError('');
+                    }}
+                    className="px-4 py-2 text-neutral-400 hover:text-neutral-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => createProject(selectedTemplate)}
+                    disabled={!newProjectName.trim()}
+                    className="px-4 py-2 bg-[#306844] hover:bg-[#1a3a24] disabled:bg-neutral-600 text-white rounded-lg transition-all duration-300 hover:scale-105"
+                  >
+                    Create Project
+                  </button>
+                </div>
               </div>
             </div>
-
-            {selectedTemplate && (
-              <div className="mb-4 p-3 bg-[#228B22]/20 border border-[#228B22]/30 rounded-lg">
-                <p className="text-sm text-[#90EE90]">
-                  <strong>Template:</strong> {selectedTemplate.description}
-                </p>
-              </div>
-            )}
-
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => {
-                  setShowCreateModal(false);
-                  setNewProjectName('');
-                  setSelectedTemplate(null);
-                  setError(''); // Clear error on cancel
-                }}
-                className="px-4 py-2 text-neutral-400 hover:text-neutral-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => createProject(selectedTemplate)}
-                disabled={!newProjectName.trim()}
-                className="px-4 py-2 bg-[#306844] hover:bg-[#1a3a24] disabled:bg-neutral-600 text-white rounded-lg transition-all duration-300 hover:scale-105"
-              >
-                Create Project
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          )}
         </div>
       </div>
 

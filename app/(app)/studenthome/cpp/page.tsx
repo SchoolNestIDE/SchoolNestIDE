@@ -17,8 +17,6 @@ import {
   IconBrandGithub,
   IconChalkboard
 } from '@tabler/icons-react';
-// Remove this import line:
-// import { FloatingNav } from "@/app/components/ui/floating-navbar";
 import { BackgroundLines } from "@/app/components/ui/background-lines";
 
 const GradientMeshBackground = ({ className = "" }) => (
@@ -37,7 +35,6 @@ const GradientMeshBackground = ({ className = "" }) => (
   </div>
 );
 
-// IndexedDB helper functions
 const DB_NAME = 'CPPProjectsDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'projects';
@@ -90,7 +87,6 @@ const deleteProject = async (id) => {
   return store.delete(id);
 };
 
-// Template projects
 const templateProjects = [
   {
     id: 'template-hello-world',
@@ -228,7 +224,6 @@ public class Calculator {
   }
 ];
 
-// Mock class data
 const mockClasses = [
   { id: 1, name: "Computer Science", code: "CS301", instructor: "Prof. Brown" }
 ];
@@ -290,25 +285,23 @@ export default function ProjectManager() {
   };
 
   const removeProject = async (projectId) => {
-  // Use window.confirm to ensure compatibility
+
   const confirmed = window.confirm('Are you sure you want to delete this project? This action cannot be undone.');
   
   if (confirmed) {
     try {
-      console.log('Attempting to delete project:', projectId); // Debug log
+      console.log('Attempting to delete project:', projectId); 
       await deleteProject(projectId);
       
-      // Update the state to remove the project from the UI
       setProjects(prev => {
         const updatedProjects = prev.filter(p => p.id !== projectId);
-        console.log('Projects after deletion:', updatedProjects.length); // Debug log
+        console.log('Projects after deletion:', updatedProjects.length);
         return updatedProjects;
       });
       
-      console.log('Project deleted successfully'); // Debug log
+      console.log('Project deleted successfully'); 
     } catch (error) {
       console.error('Error deleting project:', error);
-      // Show user-friendly error message
       alert('Failed to delete project. Please try again.');
     }
   }

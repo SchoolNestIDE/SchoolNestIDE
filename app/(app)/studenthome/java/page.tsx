@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { 
-  IconPlus, 
-  IconFolder, 
-  IconTemplate, 
-  IconSchool, 
-  IconTrash, 
-  IconEdit, 
+import {
+  IconPlus,
+  IconFolder,
+  IconTemplate,
+  IconSchool,
+  IconTrash,
+  IconEdit,
   IconExternalLink,
   IconCoffee,
   IconCode,
@@ -20,7 +20,6 @@ import {
 } from '@tabler/icons-react';
 import { BackgroundLines } from "@/app/components/ui/background-lines";
 
-// IndexedDB Configuration
 const DB_NAME = 'JavaProjectsDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'projects';
@@ -40,14 +39,13 @@ interface Project {
   template?: boolean;
 }
 
-// IDB Helper Functions
 const openDB = () => {
   return new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-    
+
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
-    
+
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
@@ -92,7 +90,6 @@ const deleteProject = async (id: string) => {
   });
 };
 
-// Template Projects
 const templateProjects: Project[] = [
   {
     id: 'template-hello-world',
@@ -171,7 +168,6 @@ public class Calculator {
   }
 ];
 
-// Mock class data
 const mockClasses = [
   { id: 1, name: "Algorithms Data AB", code: "CSA25", instructor: "Mr. Mark Estep" }
 ];
@@ -182,7 +178,7 @@ export default function ProjectManager() {
   const [newProjectName, setNewProjectName] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [validationError, setValidationError] = useState<string | null>(null); // Added validation error state
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     loadProjects();
@@ -191,7 +187,7 @@ export default function ProjectManager() {
   const loadProjects = async () => {
     try {
       const savedProjects = await getProjects();
-      setProjects(savedProjects.sort((a, b) => 
+      setProjects(savedProjects.sort((a, b) =>
         new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
       ));
     } catch (error) {
@@ -201,38 +197,38 @@ export default function ProjectManager() {
     }
   };
 
-  // Validate project name
+
   const validateProjectName = (name: string): string | null => {
     const trimmedName = name.trim();
-    
+
     if (!trimmedName) {
       return 'Project name is required';
     }
-    
+
     if (trimmedName.length < 3) {
       return 'Project name must be at least 3 characters';
     }
-    
+
     if (trimmedName.length > 50) {
       return 'Project name cannot exceed 50 characters';
     }
-    
-    // Check for duplicate names (case-insensitive)
+
+
     const nameExists = projects.some(
       project => project.name.toLowerCase() === trimmedName.toLowerCase()
     );
-    
+
     if (nameExists) {
       return 'A project with this name already exists';
     }
-    
+
     return null;
   };
 
   const createProject = async (template: Project | null = null) => {
     const trimmedName = newProjectName.trim();
     const error = validateProjectName(trimmedName);
-    
+
     if (error) {
       setValidationError(error);
       return;
@@ -240,7 +236,7 @@ export default function ProjectManager() {
 
     const newProject: Project = {
       id: `project-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name: trimmedName, // Use trimmed name
+      name: trimmedName,
       created: new Date().toISOString(),
       lastModified: new Date().toISOString(),
       files: template ? [...template.files] : [
@@ -260,7 +256,7 @@ export default function ProjectManager() {
       setProjects(prev => [newProject, ...prev]);
       setNewProjectName('');
       setSelectedTemplate(null);
-      setValidationError(null); // Clear validation error
+      setValidationError(null);
       setShowCreateModal(false);
       openIDE(newProject);
     } catch (error) {
@@ -271,7 +267,7 @@ export default function ProjectManager() {
   const createFromTemplate = (template: Project) => {
     setSelectedTemplate(template);
     setNewProjectName(template.name + ' Project');
-    setValidationError(null); // Clear previous errors
+    setValidationError(null);
     setShowCreateModal(true);
   };
 
@@ -390,7 +386,7 @@ export default function ProjectManager() {
                       <button
                         onClick={() => {
                           setShowCreateModal(true);
-                          setValidationError(null); // Clear errors when opening modal
+                          setValidationError(null);
                         }}
                         className="flex items-center gap-1 bg-[#6A4028] hover:bg-[#4B2C1A] text-white px-3 py-1.5 rounded-lg text-sm transition-all duration-300 hover:scale-105 group"
                       >
@@ -410,7 +406,7 @@ export default function ProjectManager() {
                       <button
                         onClick={() => {
                           setShowCreateModal(true);
-                          setValidationError(null); // Clear errors when opening modal
+                          setValidationError(null);
                         }}
                         className="bg-[#9c6f44] hover:bg-[#4B2C1A] text-white px-4 py-2 rounded-lg transition-colors duration-300 hover:scale-105"
                       >
@@ -530,15 +526,14 @@ export default function ProjectManager() {
                     value={newProjectName}
                     onChange={(e) => {
                       setNewProjectName(e.target.value);
-                      // Clear error when user starts typing
+
                       if (validationError) setValidationError(null);
                     }}
                     placeholder="Enter project name"
-                    className={`w-full px-3 py-2 bg-neutral-700/50 text-white border rounded-lg focus:ring-2 focus:border-transparent transition-colors ${
-                      validationError 
-                        ? 'border-red-500 focus:ring-red-500' 
+                    className={`w-full px-3 py-2 bg-neutral-700/50 text-white border rounded-lg focus:ring-2 focus:border-transparent transition-colors ${validationError
+                        ? 'border-red-500 focus:ring-red-500'
                         : 'border-neutral-600 focus:ring-[#8B5E3C]'
-                    }`}
+                      }`}
                     autoFocus
                   />
                   {validationError && (
@@ -563,7 +558,7 @@ export default function ProjectManager() {
                       setShowCreateModal(false);
                       setNewProjectName('');
                       setSelectedTemplate(null);
-                      setValidationError(null); // Clear error
+                      setValidationError(null);
                     }}
                     className="px-4 py-2 text-neutral-400 hover:text-neutral-200 transition-colors"
                   >
@@ -572,11 +567,10 @@ export default function ProjectManager() {
                   <button
                     onClick={() => createProject(selectedTemplate)}
                     disabled={!newProjectName.trim()}
-                    className={`px-4 py-2 text-white rounded-lg transition-all duration-300 hover:scale-105 ${
-                      validationError 
-                        ? 'bg-red-500/80 hover:bg-red-500' 
+                    className={`px-4 py-2 text-white rounded-lg transition-all duration-300 hover:scale-105 ${validationError
+                        ? 'bg-red-500/80 hover:bg-red-500'
                         : 'bg-[#6A4028] hover:bg-[#4B2C1A] disabled:bg-neutral-600'
-                    }`}
+                      }`}
                   >
                     Create Project
                   </button>

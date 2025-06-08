@@ -61,11 +61,6 @@ export default function Page() {
 
         setProjectList([...projectList, data.project_name]);
 
-        // if (data.error) {
-        //     console.log('Error creating project:', data.error);
-        // } else {
-        //     setProjectList([...projectList, data.project_name]);
-        // }
     }
 
 
@@ -175,7 +170,7 @@ export default function Page() {
 
             <div className="absolute top-3/4 flex items-center justify-center w-full">
                 <FloatingDock
-                    mobileClassName="translate-y-40" // only for demo, remove for production
+                    mobileClassName="translate-y-40"
                     items={links}
                 />
             </div>

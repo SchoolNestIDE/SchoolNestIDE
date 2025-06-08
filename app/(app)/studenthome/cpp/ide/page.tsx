@@ -11,7 +11,6 @@ import {
   SettingsIcon as IconSettings,
 } from "lucide-react"
 
-// Button Component
 const Button = React.forwardRef<
   HTMLButtonElement,
   React.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -50,7 +49,6 @@ const Button = React.forwardRef<
 })
 Button.displayName = "Button"
 
-// BackgroundLines Component
 const BackgroundLines = ({
   children,
   className,
@@ -96,7 +94,6 @@ const BackgroundLines = ({
   )
 }
 
-// FloatingDock Component
 const FloatingDock = ({
   items,
   className,
@@ -152,7 +149,6 @@ const FloatingDock = ({
   )
 }
 
-// FloatingNav Component
 const FloatingNav = ({
   navItems,
   className,
@@ -251,7 +247,6 @@ const FloatingNav = ({
   )
 }
 
-// BentoGrid Components
 const BentoGrid = ({
   className,
   children,
@@ -292,12 +287,6 @@ const BentoGridItem = ({
   )
 }
 
-// Utility function (if you don't have it in your project)
-// function cn(...classes: (string | undefined | null | false)[]): string {
-//   return classes.filter(Boolean).join(' ')
-// }
-
-// Main Component
 export default function FeatureInDevelopment() {
   const [countdown, setCountdown] = useState({
     days: 0,
@@ -306,11 +295,8 @@ export default function FeatureInDevelopment() {
     seconds: 0,
   })
 
-  // Set release date to 30 days from now
   useEffect(() => {
-    const releaseDate = new Date(2025, 5, 1); // Months are 0-indexed (5 = June)
-
-// Add 999 days to this date
+    const releaseDate = new Date(2025, 5, 1); 
 releaseDate.setDate(releaseDate.getDate() + 999);
 
 const timer = setInterval(() => {
