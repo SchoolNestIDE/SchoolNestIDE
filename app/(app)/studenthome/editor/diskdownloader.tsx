@@ -1,4 +1,5 @@
-import {wrap, DB, IndexedDBContextType} from './indexeddb';
+import { EmulatorContextCls } from './emulator';
+import { wrap, DB, IndexedDBContextType } from './indexeddb';
 let DOWNLOAD_PREFIX = "";
 interface WasmMemoryWithCursor extends WebAssembly.Memory {
   cursor: number;
@@ -46,22 +47,6 @@ async function downloadToBuffer(url: string, writeFunc: (loaded: number, total: 
       throw new Error(`${url} didn't tee successfully`);
     }
     let [r1, r2] = m;
-    r1.pipeTo(writable);
-    let rrr = r2.getReader();
-    let chunks = [];
-    let c = { done: false, value: null} as unknown as ReadableStreamReadResult<Uint8Array<ArrayBufferLike>>;
-    let bu = new Uint8Array(compressedSize) as ExtendedUint8ArrayWithOffsetState;
-    bu.offs = 0;
-    while (!c.done) {
-      c = await rrr.read();
-      if (c.done) {
-        break;
-
-      }
-      bu.set(c.value, bu.offs);
-      bu.offs += c.value.length;
-    }
-    toSave((bu as Uint8Array<ArrayBuffer>).buffer);
   });
 }
 async function alwaysDownload(database: IDBDatabase, path: string, writeFunc: (loaded: number, total: number) => void) {
@@ -74,81 +59,72 @@ async function alwaysDownload(database: IDBDatabase, path: string, writeFunc: (l
 
   }, async (buf: ArrayBuffer) => {
 
-    let s = db.transaction('responses', 'readwrite');
-
-    let store = s.objectStore('responses');
-    await wrap(store.put({ path: path, buf, hash: j[path + ".gz"] }));
-    console.log("writab");
-    await new Promise(resolve => s.oncomplete = resolve);
   });
 
   // let hash = await crypto.subtle.digest("SHA-256", buffer);
 
   return buffer;
 }
-
+let baseURI = '';
 async function getOrFetchResponse(idb: IndexedDBContextType, path: string, writeFunc: (loadedO: number | string, total: number) => void) {
-  let db = await idb.ensureDB();
-  let transaction = db.transaction(["responses"], 'readwrite');
-  let objectStore = transaction.objectStore('responses');
-  let count = await wrap(objectStore.count(path));
-  if (writeFunc === null) {
-    writeFunc = () => { }
+  let dd = await fetch(baseURI+path+'.gz');
+  let bdy = dd.body;
+  let dSize =  40000000;
+  if (!bdy) {
+    throw new Error("Could not fetch the resource");
   }
-  if (count === 0) {
-    // Cache-miss
-
-    return await alwaysDownload(await idb.ensureDB(), path, writeFunc);
-  } else {
-    let p = await fetch(DOWNLOAD_PREFIX + '/hashes.json');
-    let hashes = await p.json();
-    let hash: string = hashes[path + ".gz"];
-    transaction = db.transaction(["responses"], 'readwrite');
-    objectStore = transaction.objectStore('responses');
-    let md = await wrap(objectStore.get(path));
-    // console.log(hash);
-    // console.log(md.hash);
-
-    if (hash !== md.hash) {
-      transaction = db.transaction(["responses"], 'readwrite');
-      objectStore = transaction.objectStore('responses');
-      await wrap(objectStore.delete(path));
-      return await alwaysDownload(path, writeFunc);
-
+  let decompressionStream = new DecompressionStream('gzip');
+  bdy.pipeTo(decompressionStream.writable);
+  let read = decompressionStream.readable.getReader();
+  let blob = new Blob([]);
+  let loaded = 0;
+  while (true) {
+    let chk = await read.read();
+    if (chk.done) {
+      break;
     }
-    let decompressionStream = new DecompressionStream('gzip');
-    let { readable: r, writable: w } = decompressionStream;
-    let rr = r.getReader();
-    let chunks = [];
-    let totalLength = 0;
-    let controller = new AbortController();
-    let onlyForHeaders = await fetch(DOWNLOAD_PREFIX + "/disk", {
-      signal: controller.signal
-    });
-
-    totalLength = parseInt(onlyForHeaders.headers.get('Content-Length') ?? `${3 * 1024 * 1024 * 1024}`);
-    controller.abort();
-    let ww = w.getWriter();
-
-    ww.write(new Uint8Array(md.buf)).then(() => {
-      ww.close();
-    });
-    let totalWasmMemory = new WebAssembly.Memory({ initial: Math.ceil(totalLength / 65536) });
-    let ua = new Uint8Array(totalWasmMemory.buffer) as ExtendedUint8ArrayWithOffsetState;
-    ua.offs = 0;
-    while (true) {
-      let c = await rr.read();
-      if (c.done) {
-        return totalWasmMemory.buffer;
-
-      }
-      ua.set(c.value, ua.offs);
-      ua.offs += c.value.length;
-
-
-    }
-
+    let ua = chk.value;
+    blob = new Blob([blob, ua]);
+    loaded += ua.length;
+    writeFunc(loaded, dSize);
   }
-
+  return await blob.arrayBuffer();
+  
 }
-export {getOrFetchResponse};
+async function downloadLargerToVirtualDisk(emu: EmulatorContextCls, fs: any) {
+  let resp = await fetch('/saved.sqfs');
+  let len = parseInt(resp.headers.get('Content-Length') as any);
+  await fs.initialize();
+  if (!resp.body) {
+    return;
+  }
+  let reader = resp.body.getReader();
+  let a = fs.Search(0, '_disk_internal');
+  if (a <0) {
+    a = fs.CreateFile('_disk_internal', 0);
+    fs.OpenInode(a)
+  }else{
+    if (fs.inodes[a].size !== len) {
+        //pass 
+            fs.OpenInode(a)
+
+    }else {
+    return;
+    }
+  };
+  let loaded = 0;
+  while (true) {
+    let c = await reader.read();
+    if (c.done) {
+      break;
+    }
+    let val = c.value;
+    fs.Write(a, loaded, val.length, val);
+        loaded+= val.length;
+
+    emu.onProgress(loaded, len);
+  }
+  
+  await fs.CloseInode(a);
+}
+export { getOrFetchResponse, downloadLargerToVirtualDisk };

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitHub Commit Example</title>
+</head>
+
+<body>
+  <h1>GitHub Commit Multiple Files</h1>
+  <button id="commitButton">Commit Files</button>
+
+  <script>
+    const path = require('path');
+
+    const GITHUB_TOKEN = prompt('ghtoken?'); // Replace with your GitHub token
+    const OWNER = ''; // Replace with your GitHub username
+    const REPO = ''; // Replace with your repository name
+    const BRANCH = ''; // Replace with your branch name
+
+    // Function to make a GitHub API request
+    async function githubApiRequest(method, url, body) {
+      const options = {
+        method: method,
+        headers: {
+          'Authorization': `token ${GITHUB_TOKEN}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json'
+        }
+      };
+      if (body) {
+        options.body = JSON.stringify(body);
+      }
+      const response = await fetch(`https://api.github.com${url}`, options);
+      const data = await response.json();
+      return data;
+    }
+
+    // Step 1: Get the current commit reference (SHA) of the branch
+    async function getCurrentBranchSha() {
+      const response = await githubApiRequest('GET', `/repos/${OWNER}/${REPO}/git/refs/heads/${BRANCH}`);
+      console.log(response);
+      return response.object.sha;
+    }
+
+    // Step 2: Create a blob for a file content
+    async function createBlob(content) {
+      const response = await githubApiRequest('POST', `/repos/${OWNER}/${REPO}/git/blobs`, {
+        content: btoa(content), // Convert content to base64
+        encoding: 'base64'
+      });
+      return response.sha;
+    }
+    async function getCommitDetails(sha) {
+      const resp = await githubApiRequest("GET", `/repos/${OWNER}/${REPO}/git/commits/${sha}`);
+      return resp.tree.sha;
+    }
+    /**
+     * 
+     * @param {typeof import('fs')} fs
+     * */
+    async function craftTree(fs, dir = "/") {
+      return new Promise((res1, rej1) => {
+        fs.readdir(dir, (err, pathnames) => {
+          Promise.all(pathnames.map(function (name) {
+            return new Promise((resolve) => {
+              fs.stat(path.resolve(dir, name), function (err, stat) {
+                if (stat.isDirectory()) {
+                  (async () => {
+                    let q = await craftTree(fs, path.resolve(dir, name));
+                    resolve({
+                      
+                    })
+                  })();
+                }
+              })
+            }).then(function (theTree) {
+              // Array of tree ojects
+              res1(theTree);
+            })
+          }));
+        })
+      });
+    }
+    // Step 3: Create a commit object linking the blobs and parent commit
+    async function createCommit(files) {
+      // Get the current commit sha for the branch
+      const parentSha = await getCurrentBranchSha();
+
+      // Create blobs for the files
+      const gcDetails = await getCommitDetails(parentSha);
+      const tree = [];
+      for (const file of files) {
+        tree.push({
+          path: file.path,
+          mode: '100644', // File mode
+          type: 'blob',
+          content: file.content
+        });
+      }
+      // Create a new commit object
+      const createTreeResponse = await githubApiRequest('POST', `/repos/${OWNER}/${REPO}/git/trees`, {
+        tree: tree
+
+      });
+      let sh = createTreeResponse.sha;
+      let commitResponse = await githubApiRequest("POST", `/repos/${OWNER}/${REPO}/git/commits`, {
+        message: "test commit",
+        tree: sh,
+        parents: [parentSha],
+      });
+
+      return commitResponse.sha;
+    }
+
+    // Step 4: Update the reference (branch) to point to the new commit
+    async function updateBranch(newCommitSha) {
+      const response = await githubApiRequest('PATCH', `/repos/${OWNER}/${REPO}/git/refs/heads/${BRANCH}`, {
+        sha: newCommitSha
+      });
+      console.log('Branch updated:', response);
+    }
+
+    // Trigger commit
+    document.getElementById('commitButton').addEventListener('click', async () => {
+      const files = [
+        { path: 'file1.txt', content: 'Hello, world!' },
+        { path: 'file2.txt', content: 'This is a test commit.' },
+        { path: 'sigmaSigmaBoy.txt', content: 'This works now!!!' }
+      ];
+
+      try {
+        // Step 3: Create a new commit with the files
+        const newCommitSha = await createCommit(files);
+
+        // Step 4: Update the branch reference
+        await updateBranch(newCommitSha);
+
+        alert('Files committed successfully!');
+      } catch (error) {
+        console.error('Error during commit:', error);
+        alert('Failed to commit files.');
+      }
+    });
+    // 
+  </script>
+</body>
+
+</html>

@@ -6,7 +6,8 @@
     "dev": "node utils/generateHashes.mjs public && next dev ",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "q": "next export"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
@@ -44,6 +45,7 @@
     "fzstd": "^0.1.1",
     "google-protobuf": "^3.21.4",
     "gray-matter": "^4.0.3",
+    "localforage": "^1.10.0",
     "lucide-react": "^0.479.0",
     "mime-type": "^5.0.3",
     "mime-types": "^3.0.1",

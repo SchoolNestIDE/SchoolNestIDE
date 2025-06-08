@@ -1,5 +1,6 @@
 import React, { createContext, MutableRefObject, useContext } from 'react';
 import { useEditorContext } from './editorContext';
+import { resolve } from 'path/posix';
 
 const ps = require('path');
 const Filer = require('filer');
@@ -47,17 +48,15 @@ interface MemoryContextType {
     unorderedList?: HTMLUListElement,
     pendingRemoval?: HTMLUListElement
     currentTask?: number
-    fs: typeof import('fs')
+    fs: any
     nextUpdateListeners: (() => void)[],
     reference?: MutableRefObject<HTMLDivElement>,
     waitTillNextUpdate: () => Promise<void>,
     vmObject: {
-        fs?: typeof import('fs'),
-        sh: any,
-        Path: any,
-        Buffer: any
     },
-    actualUpdateCB: () => boolean
+    actualUpdateCB: () => boolean,
+    langType?: string,
+    projectName?: string
 };
 let memoryContextSettings: MemoryContextType;
 let MemoryContextContext = createContext<MemoryContextType | undefined>(undefined);
@@ -69,19 +68,20 @@ function useMemoryContext() {
 }
 
 function FileSystemProvider({ children }: { children: React.ReactNode }) {
-
-    let fs = new Filer.FileSystem({
-        name: "nest-filesystem",
-        provider: new Filer.FileSystem.providers.Memory("nest-filesystem")
-    });
-     var Path = Filer.Path;
-    var Buffer = Filer.Buffer;
-
-    var sh = new (fs as any).Shell();
+    let resolution = (a: any)=>{};
+    let _fs = new Promise((resolve)=>{
+        resolution = resolve;
+    })
 
     memoryContextSettings = {
-        fs,
-        vmObject: { fs, sh, Path, Buffer },
+        set fs(v) {
+            resolution(v);
+        },
+        get fs() {
+
+            return _fs;
+        },
+        vmObject: { },
         nextUpdateListeners: [],
         reference: undefined,
         waitTillNextUpdate() {
@@ -118,7 +118,7 @@ function FileSystemProvider({ children }: { children: React.ReactNode }) {
         }
 
     };
-    memoryContextSettings.fs = fs;
+
     let edContext = useEditorContext();
     if (edContext) {
         edContext.fs = memoryContextSettings.fs;
@@ -140,10 +140,7 @@ function FileSystemProvider({ children }: { children: React.ReactNode }) {
  * @param fs File systm reference
  * @returns The memory context
  */
-export default function getOrCreateMemoryContext(fs: typeof import('fs'), select: (q: HTMLElement) => void, editorContext: any) {
 
-    return useMemoryContext();
-}
 export {
     useMemoryContext,
     FileSystemProvider,

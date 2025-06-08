@@ -3,6 +3,7 @@ import { IndexedDBProvider } from "./indexeddb";
 import { FileSystemProvider } from "./filesystem";
 import { EditorContextProvider } from "./editorContext";
 import { EmulatorProvider } from "./emulator";
+import { GitProvider } from "./git";
 //
 // fs depends on editor context
 // emulator depends on fs
@@ -11,16 +12,16 @@ import { EmulatorProvider } from "./emulator";
 export function Providers({ children }: { children: React.ReactNode }) {
 
     return (
-        <Profiler id="test" onRender={()=>{}}>
         <IndexedDBProvider>
             <EditorContextProvider>
                 <FileSystemProvider>
                     <EmulatorProvider>
+                        <GitProvider>
                         {children}
+                        </GitProvider>
                     </EmulatorProvider>
                 </FileSystemProvider>
             </EditorContextProvider>
         </IndexedDBProvider>
-        </Profiler>
     )
 }

@@ -2,6 +2,7 @@
 
 import { BentoGrid, BentoGridItem } from "@/app/components/ui/bento-grid";
 import { BackgroundLines } from "@/app/components/ui/background-lines";
+import localForage from 'localforage';
 import {
     IconCoffee,
     IconBrandTypescript,
@@ -9,6 +10,7 @@ import {
     IconBrandPython,
     IconBrandCpp,
     IconTerminal2,
+    IconBrandGit,
 } from "@tabler/icons-react";
 import { FloatingDock } from "@/app/components/ui/floating-dock";
 import {
@@ -18,48 +20,82 @@ import {
     IconTableColumn,
 } from "@tabler/icons-react";
 import { FloatingNav } from "@/app/components/ui/floating-navbar";
-import { use } from "react";
+import { use, useRef } from "react";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Link } from "@nextui-org/react";
-
-
+import { Input, Link, Select, SelectItem } from "@nextui-org/react";
+import Prompt,{showPrompt} from "./editor/prompt";
+import Image from "next/image";
+import { StorageType, Project } from "./storage_config";
 export default function Page() {
     const { data: session } = useSession();
-    const [projectList, setProjectList] = useState<string[]>([]);
-
+    const [projectList, setProjectList] = useState<Project[]>([]);
+    localForage.config({
+        name: "nonSecretUserData",
+        storeName: "userDataStore",
+        driver: localForage.INDEXEDDB,
+        version: 1
+    });
     useEffect(() => {
-        if (session && session.user.role == 'student') {
+        
             const getProjects = async () => {
-                const response = await fetch('/api/student/get_projectlist/post', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
+                
+                let data: StorageType|null = await localForage.getItem("projectList");
+                if (!data) {
+                    // probably a new user
+                    let intiialData: StorageType = {
+                        "projects": [],
+                        organization: ""
+                    };
+                    
+                                        
+                    await localForage.setItem('projectList', intiialData);
+                    setProjectList(intiialData.projects);
+                    return;
+                }
 
-                const data = await response.json();
-
-                setProjectList(Array.isArray(data.java_project_names) ? data.java_project_names : []);
+                setProjectList(data.projects)
             }
             getProjects();
-        }
+        
     }, []);
-
+    let ref = useRef<any>(null);
     const createProject = async () => {
-        const response = await fetch('/api/student/create_java_project/post', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                template: "normal"
-            })
-        });
+        const originalProjects: StorageType = await localForage.getItem('projectList') as StorageType;
+        let project: Project = {
+            projectName: "Default-1",
+            projectType: "linux",
+            githubUsername: originalProjects.organization,
+            githubRepo: "default-repo"
+        };
+        
+        project.projectName = await showPrompt((
+            <>
+                <div>What would you like to name your new project</div>
+            </>
+        )) as string;
+        
+        await showPrompt((
+            <>
+            <div>
+                <div>What programming language would you like to use?</div>
+                <Select ref={ref} onSelectionChange={(v)=>{console.log(v); if (!v) {return;}; project.projectType = v.currentKey as any}}>
+                <SelectItem key="java" value="java">Java</SelectItem>
+                <SelectItem key="python" value="python">Python</SelectItem>
+                <SelectItem key="cpp" value="cpp">Cpp</SelectItem>
+                <SelectItem key="linux" value="linux">Linux</SelectItem>
 
-        const data = await response.json();
+                </Select>
+            </div>
+            </>
+        ), false);
 
-        setProjectList([...projectList, data.project_name]);
+        let newProjectList = [...originalProjects.projects,project];
+        let newStorage = {
+            projects: newProjectList
+        };
+        await localForage.setItem("projectList", newStorage);
+        setProjectList(newProjectList);
 
         // if (data.error) {
         //     console.log('Error creating project:', data.error);
@@ -113,15 +149,74 @@ export default function Page() {
         },
     ];
 
-    function JavaProjects() {
-        return (
+    function AllProjects() {
+        let icons = {
+            "java": (
+                <IconCoffee></IconCoffee>
+            ),
+            "linux": (
+                <IconTerminal2></IconTerminal2>
+            ),
+            "python": (
+                <IconBrandPython></IconBrandPython>
+            ),
+            "cpp": (
+                <IconBrandCpp></IconBrandCpp>
+            ),
+            "github": (
+                <IconBrandGit></IconBrandGit>
+            )
+        }
+        async function IntegrateGithub(projectName: string, e: React.MouseEvent) {
+            let inputValue = await showPrompt((
+                <div>Enter github repo link for {projectName}</div>
+            )) as string;
+            let url = null;
+            try {
+             url = new URL(inputValue);   
+            } catch {
+                 showPrompt("Please re-link this with a valid github URL");
+                return;
+            }
+            if (!url.hostname.includes("github.com")) {
+                showPrompt("Please re-link this with a valid github URL");
+                return;
+            }
+            if (url.pathname.split('/').length < 2) {
+                showPrompt("Please re-link this with a valid github URL, Include the repository name");
+                return;
+            }
+            console.log(url.pathname.split('/'));
+            let [organizationName, repoName] = url.pathname.slice(1).split('/');
+
+            let githubInfo = {
+                githubUsername: organizationName,
+                githubRepo: repoName
+            };
+            let s: StorageType|null = await localForage.getItem('projectList');
+            if (!s) {
+                return;
+            }
+            let theProject = s.projects.filter(v=>v.projectName === projectName)[0];
+            Object.assign(theProject, githubInfo);
+            await localForage.setItem("projectList", s);
+            showPrompt("Successfully enabled github integration");
+            e.preventDefault();
+            return;
+        }
+        return ( 
             <div className="my-auto h-full">
                 <div className="flex flex-col space-y-1">
+
                     {projectList?.map((project) => {
                         return (
                             <>
                                 {/* <a className="text-black dark:text-white" key={project} href="/">{project}</a> */}
-                                <Link className="text-black dark:text-white" href={`/studenthome/java/ide?project=${project}`}>{project}</Link>
+                                
+                                    <Link style={{padding: "12px", border: "2px solid white"}} className="text-black dark:text-white" href={`/studenthome/editor?projectname=${project.projectName}&langType=${project.projectType}`}>
+                                        {project.projectName}<div style={{padding:"6pt"}}>{icons[project.projectType]}</div><a style={{padding: "12px"}} onClick={IntegrateGithub.bind(null, project.projectName)} href="#">{icons['github']}</a>
+                                    </Link>
+                                
                             </>
                         );
                     })}
@@ -149,34 +244,13 @@ export default function Page() {
 
     const items = [
         {
-            title: "Your Java Projects",
+            title: "Your projects",
             description: "Explore the birth of groundbreaking ideas and inventions.",
-            header: <JavaProjects />,
+            header: <AllProjects />,
             className: "md:col-span-2",
             icon: <IconClipboardCopy className="h-4 w-4 text-neutral-500" />,
         },
-        {
-            title: "Your Linux Terminal",
-            description: "Dive into the transformative power of technology.",
-            header: <Skeleton />,
-            className: "md:col-span-1",
-            icon: <IconFileBroken className="h-4 w-4 text-neutral-500" />,
-        },
-        {
-            title: "Your Clubs",
-            description: "Discover the beauty of thoughtful and functional design.",
-            header: <GenerateClubMeetingQRCode />,
-            className: "md:col-span-1",
-            icon: <IconSignature className="h-4 w-4 text-neutral-500" />,
-        },
-        {
-            title: "Etc.",
-            description:
-                "Understand the impact of effective communication in our lives.",
-            header: <p>stest</p>,
-            className: "md:col-span-2",
-            icon: <IconTableColumn className="h-4 w-4 text-neutral-500" />,
-        },
+       
     ];
 
 
@@ -219,7 +293,7 @@ export default function Page() {
                 />
             </div>
 
-            <BentoGrid className="max-w-4xl mx-auto md:auto-rows-[20rem] pb-4">
+            <BentoGrid className=" mx-auto md:auto-rows-[20rem] pb-4">
                 {items.map((item, i) => (
                     <BentoGridItem
                         key={i}
@@ -231,6 +305,7 @@ export default function Page() {
                     />
                 ))}
             </BentoGrid>
+            <Prompt></Prompt>
 
         </>
 

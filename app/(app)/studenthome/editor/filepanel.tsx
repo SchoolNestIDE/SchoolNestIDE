@@ -1,16 +1,23 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+"use client";
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { MemoryContextType, useMemoryContext } from './filesystem';
 import { useEditorContext } from './editorContext';
+import { useEmulatorCtx } from './emulator';
+import { GitPanel } from './git';
 
+const S_IRWXUGO = 0x1FF;
+const S_IFMT = 0xF000;
+const S_IFSOCK = 0xC000;
+const S_IFLNK = 0xA000;
+const S_IFREG = 0x8000;
+const S_IFBLK = 0x6000;
+const S_IFDIR = 0x4000;
+const S_IFCHR = 0x2000;
 const newNameTemplate = "New Document ";
 const ps = require('path');
 const filePanelState: {
-  select: typeof select,
-  createNewFile: typeof createNewFile,
-  showRename: typeof showRename,
   selected?: HTMLElement,
 } = {
-  select, createNewFile, showRename,
   selected: undefined
 }
 function FileSystemFile({ name,
@@ -28,62 +35,79 @@ interface Node {
   name: string;
   stat: import('fs').Stats;
   subNodes: Node[];
-  
+
 }
 interface FileSystemTree {
   root: Node
 }
-function FileSystemNode({ node, padding, visibility }: {
-  node: Node,
+function FileSystemNode({ path, padding, visibility, root }: {
+  path: string
   padding: number,
-  visibility: boolean
+  visibility: boolean,
+  root?: boolean
 }) {
 
-  if (node.stat.isFile() || !node.subNodes) {
-    // Recursive end case
-    return (
-      <li style={{ padding: `${padding}px` }} >
-        {node.name}
-      </li>
-    )
-  };
-  const [nodeState, setNodeState] = useState(
-    {
-      visibility,
-      dirList: node.subNodes,
-      renaming: false
-    } as {
-      visibility: boolean,
-      dirList: Node[],
-      renaming: boolean
-    }
-  );
-  let memContext = useMemoryContext();
-  if (!memContext) {
-    throw new Error("FileSystemNode, no memory context");
+  if (!root) {
+    root = false;
   }
-  let {fs} = memContext;
-  function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    if (e.code === "Enter") {
-      
-      e.preventDefault();
-      let txt = e.currentTarget.textContent;
-      
+  const [fileList, setFileList] = useState([] as string[]);
+  const [viz, setVisibility] = useState(true);
+  const [selected, setSelected] = useState(true);
+  const ref = useRef();
+  ref.current = viz as any;
+  const editorContext = useEditorContext();
+  let memContext = useEmulatorCtx();
+  useEffect(() => {
+    (async () => {
+
+      console.log(memContext);
+      let fm = (await memContext.emulator).emulator.fs9p;
+      await fm.initialize();
+      setFileList(fm.read_dir(path));
+      let id = fm.SearchPath(path).id;
+      fm.Watch(id, async function ref() {
+        if (!fm.inodes[id]) {
+          fm.RemoveWatcher(id, ref);
+          return;
+        }
+        let fList = fm.read_dir(path);
+        setFileList(fList);
+        setTimeout(async () => {
+          await fm.persist()
+        })
+      })
+
+    })();
+  }, [])
+  async function oClick(evt: React.MouseEvent) {
+    let fp = (await memContext.emulator).emulator.fs9p;
+    let ino = fp.inodes[fp.SearchPath(path).id];
+    if ((ino.mode & S_IFMT) === S_IFDIR) {
+      setVisibility(!(ref.current as any as boolean)); return;
     }
+    if (!editorContext) {
+      return;
+    }
+    editorContext.fs = (await memContext.emulator).emulator.fs9p;
+    editorContext.path = path;
+    editorContext.load();
+
   }
+
   return (
-    <ul>
-      <div style={{padding: `${padding}px`}} onKeyDown={onKeyDown} contentEditable={nodeState.renaming}>{node.name}</div>
-      <div>
-        {node.subNodes.map((val, idx) => {
+    <div>
+      <div style={{ cursor: "pointer", paddingLeft: `${padding}px`, fontSize: root?"18pt": "12pt", backgroundColor: selected ? "initial" : "white"}} onClick={oClick}>{path.split('/').slice(-1)[0]}</div>
+      <div style={{ display: viz ? "block" : "none" }}>
+        {fileList.map((name, idx) => {
           return (
-            <FileSystemNode visibility={ nodeState.visibility} node={val} padding={padding + 2}>
+            <FileSystemNode key={idx} visibility={visibility} path={(path === "/" ? "" : path) + "/" + name} padding={padding + 20}>
 
             </FileSystemNode>
           )
         })}
       </div>
-    </ul>
+    </div>
+    
   )
 }
 function nodeifyTree(memoryContext: MemoryContextType, path: string) {
@@ -92,6 +116,56 @@ function nodeifyTree(memoryContext: MemoryContextType, path: string) {
 }
 function FileSystemRoot() {
   let qState = useMemoryContext();
+
+  let eu = useEmulatorCtx();
+  let [st, setSt] = useState((
+    <>
+      <div>Loading file tree</div>
+    </>
+  ));
+
+  useEffect(() => {
+    (async () => {
+      if (!qState) {
+        return;
+      }
+      let se = globalThis as any;
+      let params = new URLSearchParams((se.location as any).search);
+      let projectname = params.get("projectname");
+      let langtype = params.get('langtype');
+      if (!langtype) {
+        langtype = "linux"
+      }
+      qState.langType = langtype;
+      if (!projectname) {
+        projectname = "Default"
+      }
+      qState.projectName = projectname;
+      let a = await eu.emulator;
+      let fs = a.emulator.fs9p;
+      await fs.initialize();
+      
+      let am = fs.Search(0, projectname);
+      if (am >= 0) {
+      } else {
+        fs.CreateDirectory(projectname, 0);
+      }
+      setTimeout(() => {
+        history.replaceState(null, "", (se.location as any).href.split('?')[0]);
+
+      }, 200);
+      let toWrite = (
+        <FileSystemNode path={"/" + projectname} padding={-20} visibility={true} root={true}></FileSystemNode>
+      );
+      setSt(toWrite);
+    })()
+
+  }, []);
+
+
+
+
+
   if (!qState) {
     return (
       <h1>
@@ -99,125 +173,16 @@ function FileSystemRoot() {
       </h1>
     )
   };
-  
+
   return (
-    <FileSystemNode ></FileSystemNode>
-  );
+    <>
+      {st}
+    </>
+  )
 }
 type FilePanelStateType = typeof filePanelState;
 const FilePanelContext = createContext<FilePanelStateType | undefined>(undefined);
-function getSelectedPath() {
-  if (!filePanelState.selected) {
-    //nothing is selected
-    return null;
-  }
-  return filePanelState.selected.getAttribute('data-path');
-}
-function showRename(path: string, switchTo = false) {
-  let memoryContextSettings = useMemoryContext();
-  const editorContext = useEditorContext();
 
-  if (!memoryContextSettings || !editorContext) {
-    return;
-  }
-  let em = document.querySelector(`[data-path="${path}"]`);
-
-  if (!em) {
-    return;
-  }
-  let inp = document.createElement('input');
-  inp.type = "text";
-  inp.placeholder = ps.basename(path);
-  inp.onkeydown = async (ev) => {
-    let shouldStop = ev.key === "Enter";
-    if (shouldStop) {
-      ev.preventDefault();
-      // console.log(em);
-      em.textContent = inp.value;
-      inp.replaceWith(em);
-      inp.remove();
-      memoryContextSettings.fs.rename(path, ps.resolve(ps.dirname(path), inp.value), async () => {
-        await memoryContextSettings.waitTillNextUpdate();
-        let qt = document.querySelector(`[data-path="${ps.resolve(ps.dirname(path), inp.value)}"]`) as HTMLElement | null;
-        if (!qt) return; // file creation failed
-        select(qt);
-
-        editorContext.path = ps.resolve(ps.dirname(path), inp.value);
-        editorContext.load();
-      });
-
-    } else {
-
-    }
-  }
-  em.replaceWith(inp);
-  inp.focus();
-}
-function select(news: HTMLElement) {
-  let selected = useFilePanelState()?.selected;
-  if (selected) {
-
-    selected.style.backgroundColor = "";
-  }
-  filePanelState.selected = news;
-  news.style.backgroundColor = "gray";
-}
-function createNewFile() {
-  let pat = getSelectedPath() ?? "/";
-  // console.log(pat);
-  let memoryContextSettings = useMemoryContext();
-  const editorContext = useEditorContext();
-
-  if (!memoryContextSettings || !editorContext) {
-    return;
-  }
-  function foundTargetDirectory(target: string, num: number) {
-    if (!memoryContextSettings || !editorContext) {
-      return;
-    }
-    let f = memoryContextSettings.fs;
-    let template = `${newNameTemplate} ${num}`;
-    let newTarget = ps.resolve(target, template);
-    f.stat(newTarget, (err: any, stat: any) => {
-      // console.log(err);
-      if (err) {
-        // Found sweet spot
-        makeTheActualFile(newTarget);
-
-      } else {
-        // Found the file create a new file
-        foundTargetDirectory(target, num + 1);
-
-      }
-    })
-  }
-  async function makeTheActualFile(target: string) {
-    if (!memoryContextSettings || !editorContext) {
-      return;
-    }
-    memoryContextSettings.fs.writeFile(target, "", async () => {
-      await memoryContextSettings.waitTillNextUpdate();
-      showRename(target, true);
-    })
-
-  }
-  function parentTillTarget(p: string) {
-    if (!memoryContextSettings || !editorContext) {
-      return;
-    }
-    memoryContextSettings.fs.stat(p, (err: any, st: import('fs').Stats) => {
-
-      let parent = ps.resolve(pat, '..');
-      if (st.isDirectory()) {
-        foundTargetDirectory(p, 1);
-      }
-      else {
-        parentTillTarget(parent);
-      }
-    })
-  }
-  parentTillTarget(pat);
-}
 export function FilePanelProvider({ children }: { children: React.ReactNode }) {
   return (
     <FilePanelContext.Provider value={filePanelState}>
@@ -230,20 +195,21 @@ export
   function back() {
     location.href = "/studenthome"
   }
-  let qState = useContext(FilePanelContext);
-  if (!qState) {
-    // need rerender
-    return;
-  }
+
 
 
   return (
-    <div style={{ minWidth: "10%", fontSize: "18px", height: "100%", backgroundColor: "black", color: "white" }} id="cmenurelev">
-sdf
+    <div style={{ display: "flex", flexDirection: "column", minWidth: "20%", fontSize: "18px", backgroundColor: "black", color: "white" }} id="cmenurelev">
+      <div style={{ position: 'relative', overflow: "auto"}}>
+        <FileSystemRoot></FileSystemRoot>
+      </div>
+      <div style={{ position: "relative" }}>
+        <GitPanel></GitPanel>
+      </div>
     </div>
   )
 }
 function useFilePanelState() {
   return useContext(FilePanelContext);
 }
-export { filePanelState, FilePanelContext, FileSystemRoot};
+export { filePanelState, FilePanelContext, FileSystemRoot };
