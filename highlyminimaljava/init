@@ -1,5 +1,5 @@
 #!/bin/bash
-DISK_SIZE=298549248
+DISK_SIZE=204087296
 packed_hosts() {
 cat <<EOF
 # Standard host addresses

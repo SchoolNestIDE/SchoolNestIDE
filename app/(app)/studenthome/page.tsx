@@ -24,7 +24,7 @@ import { use, useRef } from "react";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Input, Link, Select, SelectItem } from "@nextui-org/react";
-import Prompt,{showPrompt} from "./editor/prompt";
+import Prompt, { showPrompt } from "./editor/prompt";
 import Image from "next/image";
 import { StorageType, Project } from "./storage_config";
 export default function Page() {
@@ -37,60 +37,64 @@ export default function Page() {
         version: 1
     });
     useEffect(() => {
-        
-            const getProjects = async () => {
-                
-                let data: StorageType|null = await localForage.getItem("projectList");
-                if (!data) {
-                    // probably a new user
-                    let intiialData: StorageType = {
-                        "projects": [],
-                        organization: ""
-                    };
-                    
-                                        
-                    await localForage.setItem('projectList', intiialData);
-                    setProjectList(intiialData.projects);
-                    return;
-                }
 
-                setProjectList(data.projects)
+        const getProjects = async () => {
+
+            let data: StorageType | null = await localForage.getItem("projectList");
+            if (!data) {
+                // probably a new user
+                let intiialData: StorageType = {
+                    "projects": [],
+                    organization: ""
+                };
+
+
+                await localForage.setItem('projectList', intiialData);
+                setProjectList(intiialData.projects);
+                return;
             }
-            getProjects();
-        
+
+            setProjectList(data.projects)
+        }
+        getProjects();
+
     }, []);
     let ref = useRef<any>(null);
+    const deleteProject = async () => {
+        const originalProjects: StorageType = await localForage.getItem('projectList') as StorageType;
+    }
     const createProject = async () => {
         const originalProjects: StorageType = await localForage.getItem('projectList') as StorageType;
         let project: Project = {
             projectName: "Default-1",
             projectType: "linux",
             githubUsername: originalProjects.organization,
-            githubRepo: "default-repo"
+            githubRepo: "default-repo",
+            toBeDeleted: false
         };
-        
+
         project.projectName = await showPrompt((
             <>
                 <div>What would you like to name your new project</div>
             </>
         )) as string;
-        
+
         await showPrompt((
             <>
-            <div>
-                <div>What programming language would you like to use?</div>
-                <Select ref={ref} onSelectionChange={(v)=>{console.log(v); if (!v) {return;}; project.projectType = v.currentKey as any}}>
-                <SelectItem key="java" value="java">Java</SelectItem>
-                <SelectItem key="python" value="python">Python</SelectItem>
-                <SelectItem key="cpp" value="cpp">Cpp</SelectItem>
-                <SelectItem key="linux" value="linux">Linux</SelectItem>
+                <div>
+                    <div>What programming language would you like to use?</div>
+                    <Select ref={ref} onSelectionChange={(v) => { console.log(v); if (!v) { return; }; project.projectType = v.currentKey as any }}>
+                        <SelectItem key="java" value="java">Java</SelectItem>
+                        <SelectItem key="python" value="python">Python</SelectItem>
+                        <SelectItem key="cpp" value="cpp">Cpp</SelectItem>
+                        <SelectItem key="linux" value="linux">Linux</SelectItem>
 
-                </Select>
-            </div>
+                    </Select>
+                </div>
             </>
         ), false);
 
-        let newProjectList = [...originalProjects.projects,project];
+        let newProjectList = [...originalProjects.projects, project];
         let newStorage = {
             projects: newProjectList
         };
@@ -173,9 +177,9 @@ export default function Page() {
             )) as string;
             let url = null;
             try {
-             url = new URL(inputValue);   
+                url = new URL(inputValue);
             } catch {
-                 showPrompt("Please re-link this with a valid github URL");
+                showPrompt("Please re-link this with a valid github URL");
                 return;
             }
             if (!url.hostname.includes("github.com")) {
@@ -193,18 +197,22 @@ export default function Page() {
                 githubUsername: organizationName,
                 githubRepo: repoName
             };
-            let s: StorageType|null = await localForage.getItem('projectList');
+            let s: StorageType | null = await localForage.getItem('projectList');
             if (!s) {
                 return;
             }
-            let theProject = s.projects.filter(v=>v.projectName === projectName)[0];
+            let theProject = s.projects.filter(v => v.projectName === projectName)[0];
             Object.assign(theProject, githubInfo);
             await localForage.setItem("projectList", s);
-            showPrompt("Successfully enabled github integration");
+            showPrompt((
+                <div>
+                    Successfully enabled github integration
+                </div>
+            ), true);
             e.preventDefault();
             return;
         }
-        return ( 
+        return (
             <div className="my-auto h-full">
                 <div className="flex flex-col space-y-1">
 
@@ -212,11 +220,11 @@ export default function Page() {
                         return (
                             <>
                                 {/* <a className="text-black dark:text-white" key={project} href="/">{project}</a> */}
-                                
-                                    <Link style={{padding: "12px", border: "2px solid white"}} className="text-black dark:text-white" href={`/studenthome/editor?projectname=${project.projectName}&langType=${project.projectType}`}>
-                                        {project.projectName}<div style={{padding:"6pt"}}>{icons[project.projectType]}</div><a style={{padding: "12px"}} onClick={IntegrateGithub.bind(null, project.projectName)} href="#">{icons['github']}</a>
-                                    </Link>
-                                
+
+                                <Link style={{ padding: "12px", border: "2px solid white" }} className="text-black dark:text-white" href={`/studenthome/editor?projectname=${project.projectName}&langType=${project.projectType}`}>
+                                    {project.projectName}<div style={{ padding: "6pt" }}>{icons[project.projectType]}</div><a style={{ padding: "12px" }} onClick={IntegrateGithub.bind(null, project.projectName)} href="javascript:">{icons['github']}</a>
+                                </Link>
+
                             </>
                         );
                     })}
@@ -250,7 +258,7 @@ export default function Page() {
             className: "md:col-span-2",
             icon: <IconClipboardCopy className="h-4 w-4 text-neutral-500" />,
         },
-       
+
     ];
 
 

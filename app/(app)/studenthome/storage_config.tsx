@@ -2,7 +2,8 @@ interface Project {
     projectName: string,
     projectType: "python"|"cpp"|"linux"|"java",
     githubUsername: string,
-    githubRepo: string
+    githubRepo: string,
+    toBeDeleted:boolean
 }
 interface StorageType {
     projects: Project[],

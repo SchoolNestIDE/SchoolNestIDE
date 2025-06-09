@@ -127,7 +127,25 @@ function EmulatorProvider({ children }: { children: React.ReactNode }) {
       });
       let qs = (await inst.getItem("/diskbuffer")) as ArrayBuffer|undefined;
       if (!qs) {
-        qs = await (await fetch('/disk')).arrayBuffer();
+        let r = await fetch('/disk');
+        qs = new ArrayBuffer(parseInt(r.headers.get("Content-Length") ?? "0"));
+        let ua = new Uint8Array(qs);
+        let b = r.body;
+        if (!b) {
+          throw new Error("Could not retreive response body");
+        }
+        let reader = b.getReader();
+        let off = 0;
+        while (true) {
+          let ch = await reader.read();
+          if (ch.done) {
+            //value is null
+            break;
+          }
+            c.onProgress(off, qs.byteLength);
+          ua.set(ch.value, off);
+          off += ch.value.length;
+        }
         await inst.setItem("/diskbuffer", qs);
       }
       let u = new URL(location.href);

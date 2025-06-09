@@ -9,10 +9,8 @@ import { useEmulatorCtx } from './emulator';
 import { MongoCryptCreateEncryptedCollectionError } from 'mongodb';
 import { useEditorContext } from './editorContext';
 import { useMemoryContext } from './filesystem';
-const GITHUB_TOKEN = ''; // Replace with your GitHub token
-const OWNER = ''; // Replace with your GitHub username
-const REPO = ''; // Replace with your repository name
-const BRANCH = 'main'; // Replace with your branch name
+import { AnyBulkWriteOperation } from 'mongoose';
+
 /*
 MIT License
 Copyright (c) 2020 Egor Nepomnyaschih
@@ -167,7 +165,7 @@ async function githubApiRequest(token: string, method: string, url: string, body
 
 // Step 1: Get the current commit reference (SHA) of the branch
 async function getCurrentBranchSha(gctx: GitCtx) {
-  const response = await githubApiRequest(gctx.ghApiToken, 'GET', `/repos/${gctx.owner}/${gctx.repo}/git/refs/heads/${BRANCH}`);
+  const response = await githubApiRequest(gctx.ghApiToken, 'GET', `/repos/${gctx.owner}/${gctx.repo}/git/refs/heads/main`);
   console.log(response);
   return response.object.sha;
 }
@@ -188,24 +186,30 @@ async function ct(ghCtx: GitCtx, fs: any, path: string, idx: number) {
 
   let currentElement = {
     path: path.split('/').slice(-1)[0],
-    mode: fs.inodes[idx].mode,
+    mode: fs.IsDirectory(idx) ? "040000" : "100644",
     type: fs.IsDirectory(idx) ? "tree" : "blob",
     sha: "",
-    content: ""
-  }
+    content: null
+  } as any;
   if (fs.IsDirectory(idx)) {
     // get the sha file;
     let theTree = await craftTree(ghCtx, fs, ct, path);
     let reqObject = {
       tree: theTree
     };
-    let r= await githubApiRequest(ghCtx.ghApiToken, 'POST', `https://api.github.com/repos/${ghCtx.owner}/${ghCtx.repo}/git/trees`, reqObject);
+    let r= await githubApiRequest(ghCtx.ghApiToken, 'POST', `/repos/${ghCtx.owner}/${ghCtx.repo}/git/trees`, reqObject);
     currentElement.sha = r.sha;
+    delete currentElement.content;
   }
   else {
     let d = bytesToBase64(await fs.read_file(path));
-    console.log(d);
+    let bsha = await createBlob(ghCtx, d);
+    currentElement.sha = bsha;
+    delete currentElement.content;
+
+
   }
+  return currentElement;
 }
 interface GitCtx {
   owner: string,
@@ -213,30 +217,20 @@ interface GitCtx {
   ghApiToken: string
 }
 // Step 3: Create a commit object linking the blobs and parent commit
-async function createCommit(gctx: GitCtx, files: any) {
+async function createCommit(gctx: GitCtx, rootSha: string) {
   // Get the current commit sha for the branch
   const parentSha = await getCurrentBranchSha(gctx);
 
   // Create blobs for the files
-  const gcDetails = await getCommitDetails(gctx,parentSha);
-  const tree = [];
-  for (const file of files) {
-    tree.push({
-      path: file.path,
-      mode: '100644', // File mode
-      type: 'blob',
-      content: file.content
-    });
-  }
-  // Create a new commit object
-  const createTreeResponse = await githubApiRequest(gctx.ghApiToken, 'POST', `/repos/${OWNER}/${REPO}/git/trees`, {
-    tree: tree
-
-  });
-  let sh = createTreeResponse.sha;
-  let commitResponse = await githubApiRequest(gctx.ghApiToken, "POST", `/repos/${OWNER}/${REPO}/git/commits`, {
-    message: "test commit",
-    tree: sh,
+  
+  
+  let commitResponse = await githubApiRequest(gctx.ghApiToken, "POST", `/repos/${gctx.owner}/${gctx.repo}/git/commits`, {
+    message: await showPrompt((
+      <>
+        <div>What would you like to name your commit?</div>
+      </>
+    )),
+    tree: rootSha,
     parents: [parentSha],
   });
 
@@ -245,7 +239,7 @@ async function createCommit(gctx: GitCtx, files: any) {
 
 // Step 4: Update the reference (branch) to point to the new commit
 async function updateBranch(gctx: GitCtx, newCommitSha: string) {
-  const response = await githubApiRequest(gctx.ghApiToken, 'PATCH', `/repos/${OWNER}/${REPO}/git/refs/heads/${BRANCH}`, {
+  const response = await githubApiRequest(gctx.ghApiToken, 'PATCH', `/repos/${gctx.owner}/${gctx.repo}/git/refs/heads/main`, {
     sha: newCommitSha
   });
   console.log('Branch updated:', response);
@@ -463,6 +457,56 @@ class GitContextType {
     this._owner = owner;
   }
 }
+function EnsurePathComponents(fs: any, path: string) {
+  let components = path.split('/').slice(1); // ignore root
+  let len = components.length;
+  let parentId = 0;
+  let id = 0;
+  for (let a of components) {
+    let d = fs.Search(parentId, a);
+    if (d < 0 && len > 1) {
+      // create it
+      parentId = fs.CreateDirectory(a, parentId);
+      len --;
+      continue;
+    };
+    if (d < 0 && len === 1) {
+      id = fs.CreateFile( a,parentId);
+      return id;
+    }else if (len === 1) {
+      return d;
+    }
+    parentId = d;
+    len--;
+  }
+
+}
+async function pull(gitCtx: GitCtx, fs: any, root="/") {
+  let latestCommitSha = await getCurrentBranchSha(gitCtx) as string;
+  let h = await githubApiRequest(gitCtx.ghApiToken, "GET", `/repos/${gitCtx.owner}/${gitCtx.repo}/git/commits/${latestCommitSha}`);
+  let treeSha = h.tree.sha;
+  let gTree = await githubApiRequest(gitCtx.ghApiToken, "GET", `/repos/${gitCtx.owner}/${gitCtx.repo}/git/trees/${treeSha}?recursive=true`);
+  let theTree = gTree.tree;
+  let {id: rootId} = fs.SearchPath(root);
+  
+  async function walkGithubTree(currentTree: any[],rootId: number) {
+
+    for (let node of currentTree) {
+
+      
+        let fileSha = node.sha;
+        let {content} = await githubApiRequest(gitCtx.ghApiToken, "GET", `/repos/${gitCtx.owner}/${gitCtx.repo}/git/blobs/${fileSha}`);
+        let ab = Buffer.from(content,"base64");
+        let bufferToWrite = new Uint8Array(ab);
+        let pcId = EnsurePathComponents(fs, root+"/"+node.path);
+        await fs.Write(pcId, 0, bufferToWrite.length, bufferToWrite);
+        
+    } 
+  }
+  await walkGithubTree(theTree, rootId);
+
+
+}
 const GitPanel: React.FC = () => {
   let fs = useEmulatorCtx();
   let gc = useGitContext();
@@ -481,16 +525,38 @@ const GitPanel: React.FC = () => {
     let f = emu.emulator.fs9p;
     let [uname, pname] = [await ec.getUserName(mc.projectName), await ec.getRepoName(mc.projectName)]
     console.log(`Username: ${uname} and reponame ${pname}`);
-    console.log(await craftTree({
+    let c = {
       ghApiToken: ghToken as string,
       owner:  uname,
       repo: pname
-    },f,ct,'/'+mc.projectName));
+    };
+    let t = await craftTree(c,f,ct,'/'+mc.projectName);
+    let a = {
+      tree: t
+    };
+    let r= await githubApiRequest(ghToken as string, 'POST', `/repos/${uname}/${pname}/git/trees`, a);
+    let rootTreeSha = r.sha;
+    let ac = await createCommit(c, rootTreeSha);
+    await updateBranch(c, ac);
   };
   
-  const handlePull = () => {
+  const handlePull = async() => {
     // TODO: Implement pull functionality
-    alert('Pull clicked');
+    if ( !db || !ec || !mc || !mc.projectName || !mc.langType) return;
+    let ghToken = await getOrCreateGithubToken(await db.ensureDB());
+    let emu = await fs.emulator;
+    let f = emu.emulator.fs9p;
+    let [uname, pname] = [await ec.getUserName(mc.projectName), await ec.getRepoName(mc.projectName)]
+    let c = {
+      ghApiToken: ghToken as string,
+      owner:  uname,
+      repo: pname
+    };
+    await pull(c,f, "/"+mc.projectName);
+
+    console.log(`Username: ${uname} and reponame ${pname}`);
+
+    
   };
   useEffect(()=>{
     (async()=>{

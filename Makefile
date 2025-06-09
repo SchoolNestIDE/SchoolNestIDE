@@ -23,7 +23,7 @@ docker:
 larger-disk:
 	cd highlyminimaljava && bash main.sh
 	@echo "Crafted larger disk, stored in compressed tar"
-disk: docker
+disk: build_jcompserver docker
 	cd minidisk && bash main.sh
 	@echo "Created disk"
 	cd ..
@@ -38,6 +38,8 @@ clean-disk:
 	docker rmi nestdocker_larger || :
 	docker container stop -t 0 nestdocker  && docker rm nestdocker || :
 	docker rmi nestdocker || :
+build_jcompserver:
+	 docker run -v .:/mnt -it --rm i386/debian:bullseye-slim /mnt/build_fakemain.sh
 clean: clean-disk
 public/vscode:
 	wget "$(URL)" -O /tmp/vsc.zip

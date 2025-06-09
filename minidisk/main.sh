@@ -22,8 +22,9 @@ sudo setcap "cap_sys_admin=ep" "$MOUNT_DIR"/bin/nest-client
 sudo cp ./run_as_nc.sh "${MOUNT_DIR}"/run_as_nc.sh
 sudo cp ./run_in_chroot.sh "${MOUNT_DIR}"/bin/j17
 sudo chmod +x "$MOUNT_DIR"/bin/j17
-sudo cp ./in_chroot.sh "${MOUNT_DIR}"/in_chroot.sh
-sudo chmod +x /in_chroot.sh
+sudo cp ../jcomp/Main.sh "${MOUNT_DIR}"/usr/bin/j17_optimized
+sudo chmod +x "${MOUNT_DIR}"/usr/bin/j17_optimized
+sudo cp -v ../jcomp/FakeMain.class "${MOUNT_DIR}"/.
 SUODERS="nest ALL=(ALL:ALL) ALL"
 echo "$SUDOERS" | sudo tee -a "${MOUNT_DIR}"/etc/sudoers
 echo "RUNNING SQUASHFS ${MOUNT_DIR}"

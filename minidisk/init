@@ -25,13 +25,15 @@ udhcpc
 mkdir /mnt/_internal
 if [ ! -f /mnt/_internal/disk_debian_slim ]
 then
-    wget -O /mnt/_internal/disk_debian_slim ${HOSTNAME}/disk.larger
+    wget -O /mnt/_internal/disk_debian_slim "${HOSTNAME}"/disk.larger
 fi
 if [ ! -f /mnt/_internal/jdk.tar.gz ]
 then
-    wget -O /mnt/_internal/jdk.tar.gz ${HOSTNAME}/jdk.tar.gz
+    wget -O /mnt/_internal/jdk.tar.gz "${HOSTNAME}"/jdk.tar.gz
     mkdir /mnt/_internal/jdk
-    pv /mnt/_internal/jdk.tar.gz | tar -C /mnt/_internal/jdk -xzf -
+    pv /mnt/_internal/jdk.tar.gz | gzip -d > /tmp/jdk.tar
+    pv /tmp/jdk.tar | tar -C /mnt/_internal/jdk -xf -
+    rm /tmp/jdk.tar
 fi
 mkdir /tmp/new-chroot
 mount /mnt/_internal/disk_debian_slim /tmp/new-chroot
@@ -44,5 +46,10 @@ cp -rvf /mnt/_internal/jdk /tmp/jdk
 mount --bind /tmp/jdk /tmp/new-chroot/tmp/jdk
 mkdir /dev/pts
 mount -t devpts /dev/pts /dev/pts
-mount --bind /mnt/$PROJNAME /home/nest
+mount --bind "/mnt/$PROJNAME" /home/nest
+mkfifo -m 777 /tmp/srvStream
+j17 java -cp / FakeMain &
+while :
+do
 script -q -c "/bin/su nest -c\"cd /home/nest && exec sh\"" /dev/null
+done
