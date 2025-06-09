@@ -25,11 +25,11 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { cn } from "@/app/lib/utils";
-
 import React, { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useSearchParams } from "next/navigation";
 import { Code, Edit3, Play, Trash2 } from "lucide-react";
+import { Octokit } from "@octokit/rest";
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
@@ -52,6 +52,7 @@ interface Project {
   created: string;
   lastModified: string;
   files: File[];
+  githubRepo?: string;
 }
 
 const DB_NAME = 'JavaProjectsDB';
@@ -176,17 +177,9 @@ public class CustomFileInputStream extends InputStream {
             // set the custom InputStream as the standard input
             System.setIn(new CustomFileInputStream());
 
-            // System.out.println(args[0]);
-            // Class<?> clazz = Class.forName(args[0]);
-            // Method method = clazz.getMethod("main", String[].class);
-            // method.invoke(null, (Object) new String[]{});
-
             // invoke main method in the user's main class
-            // Main clazz2 = new Main();
             Main.main(new String[0]);
 
-        // } catch (InvocationTargetException e) {
-        //     e.getTargetException().printStackTrace();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -211,6 +204,15 @@ public class CustomFileInputStream extends InputStream {
   const [projectData, setProjectData] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [outputHeight, setOutputHeight] = useState(200);
+  const [githubToken, setGithubToken] = useState<string | null>(null);
+  const [showTokenModal, setShowTokenModal] = useState(false);
+  const [showCloneModal, setShowCloneModal] = useState(false);
+  const [cloneUrl, setCloneUrl] = useState("");
+
+  useEffect(() => {
+    const token = localStorage.getItem('githubToken');
+    if (token) setGithubToken(token);
+  }, []);
 
   useEffect(() => {
     const loadProject = async () => {
@@ -230,6 +232,338 @@ public class CustomFileInputStream extends InputStream {
 
     loadProject();
   }, [projectId]);
+
+  const checkToken = () => {
+    const token = localStorage.getItem('githubToken');
+    if (!token) {
+      setShowTokenModal(true);
+      return null;
+    }
+    return token;
+  };
+
+  // Replace the handlePush function with this fixed version
+const handlePush = async () => {
+  const token = checkToken();
+  if (!token) return;
+  
+  try {
+    const octokit = new Octokit({ auth: token });
+    
+    // Get repo name from project or prompt
+    let repoName = projectData?.githubRepo || prompt("Enter GitHub repository name:");
+    if (!repoName) return;
+    
+    // Remove any owner prefix if provided (e.g., "owner/repo" -> "repo")
+    if (repoName.includes('/')) {
+      repoName = repoName.split('/')[1];
+    }
+    
+    // Get username
+    const { data: user } = await octokit.users.getAuthenticated();
+    const owner = user.login;
+
+    // Check if repo exists, create only if it doesn't
+    let repoExists = false;
+    try {
+      await octokit.repos.get({ owner, repo: repoName });
+      repoExists = true;
+      setOutputLines(prev => [...prev, `Repository ${owner}/${repoName} found, updating files...`]);
+    } catch (error: any) {
+      if (error.status === 404) {
+        // Repository doesn't exist, create it
+        try {
+          await octokit.repos.createForAuthenticatedUser({ 
+            name: repoName,
+            private: false, // Set to true if you want private repos by default
+            description: `Project created with SchoolNest IDE`
+          });
+          setOutputLines(prev => [...prev, `Created new repository: ${owner}/${repoName}`]);
+          repoExists = true;
+        } catch (createError: any) {
+          if (createError.message.includes("name already exists")) {
+            setOutputLines(prev => [...prev, `Repository ${repoName} already exists but is not accessible. Check permissions or try a different name.`]);
+            return;
+          }
+          throw createError;
+        }
+      } else {
+        throw error;
+      }
+    }
+
+    if (!repoExists) {
+      setOutputLines(prev => [...prev, `Failed to access or create repository: ${repoName}`]);
+      return;
+    }
+
+    // Commit all files (excluding CustomFileInputStream.java which is system-generated)
+    let successCount = 0;
+    let errorCount = 0;
+    
+    for (const file of files) {
+      // Skip only the system-generated CustomFileInputStream.java
+      if (file.filename === 'CustomFileInputStream.java') continue;
+      
+      try {
+        // Try to get existing file to get its SHA
+        let sha;
+        try {
+          const { data: existingFile } = await octokit.repos.getContent({
+            owner,
+            repo: repoName,
+            path: file.filename,
+          });
+          
+          // Handle both single file and array responses
+          if (Array.isArray(existingFile)) {
+            sha = existingFile[0]?.sha;
+          } else if ('sha' in existingFile) {
+            sha = existingFile.sha;
+          }
+        } catch (error) {
+          // File doesn't exist, no SHA needed
+          sha = undefined;
+        }
+
+        // Create or update file
+        const params: any = {
+          owner,
+          repo: repoName,
+          path: file.filename,
+          message: sha ? `Update ${file.filename}` : `Add ${file.filename}`,
+          content: btoa(unescape(encodeURIComponent(file.contents))), // Handle UTF-8 properly
+        };
+
+        if (sha) {
+          params.sha = sha;
+        }
+
+        await octokit.repos.createOrUpdateFileContents(params);
+        successCount++;
+        setOutputLines(prev => [...prev, `✓ ${sha ? 'Updated' : 'Added'} ${file.filename}`]);
+        
+      } catch (fileError: any) {
+        errorCount++;
+        console.error(`Error updating ${file.filename}:`, fileError);
+        setOutputLines(prev => [...prev, `✗ Error with ${file.filename}: ${fileError.message}`]);
+      }
+    }
+
+    // Update project with repo info if successful
+    if (successCount > 0 && projectData) {
+      const updatedProject = {
+        ...projectData,
+        githubRepo: `${owner}/${repoName}`,
+        lastModified: new Date().toISOString()
+      };
+      await saveProject(updatedProject);
+      setProjectData(updatedProject);
+    }
+
+    // Summary message
+    if (successCount > 0) {
+      setOutputLines(prev => [...prev, `Successfully pushed ${successCount} file(s) to ${owner}/${repoName}`]);
+      if (errorCount > 0) {
+        setOutputLines(prev => [...prev, `${errorCount} file(s) had errors`]);
+      }
+    } else {
+      setOutputLines(prev => [...prev, `Failed to push files to ${owner}/${repoName}`]);
+    }
+    
+  } catch (error: any) {
+    console.error('Push error:', error);
+    setOutputLines(prev => [...prev, `Push error: ${error.message || 'Unknown error occurred'}`]);
+    
+    // Provide specific guidance for common errors
+    if (error.message.includes('Bad credentials')) {
+      setOutputLines(prev => [...prev, 'Please check your GitHub token and ensure it has the correct permissions']);
+    } else if (error.message.includes('Not Found')) {
+      setOutputLines(prev => [...prev, 'Repository not found. Please check the repository name and your access permissions']);
+    }
+  }
+};
+
+
+const handlePull = async () => {
+  const token = checkToken();
+  if (!token) return;
+  
+  // Allow pull even if no repo is set in project data
+  let repoName = projectData?.githubRepo;
+  if (!repoName) {
+    repoName = prompt("Enter GitHub repository name (owner/repo):");
+    if (!repoName) return;
+  }
+  
+  try {
+    const octokit = new Octokit({ auth: token });
+    
+    // Parse owner/repo from input
+    let owner, repo;
+    if (repoName.includes('/')) {
+      [owner, repo] = repoName.split('/');
+    } else {
+      const { data: user } = await octokit.users.getAuthenticated();
+      owner = user.login;
+      repo = repoName;
+    }
+
+    const { data: contents } = await octokit.repos.getContent({
+      owner,
+      repo,
+      path: '',
+    });
+
+    if (Array.isArray(contents)) {
+      const newFiles = await Promise.all(
+        contents.map(async (file: any) => {
+          // Pull all files, not just .java files
+          if (file.type === 'file') {
+            const { data: fileContent } = await octokit.repos.getContent({
+              owner,
+              repo,
+              path: file.path,
+            });
+            
+            // Handle both API response formats
+            //@ts-ignore
+            const content = fileContent.content ? 
+            //@ts-ignore
+              atob(fileContent.content.replace(/\s/g, '')) : 
+              await (await fetch(file.download_url)).text();
+            
+            return {
+              filename: file.name,
+              contents: content
+            };
+          }
+          return null;
+        }).filter(Boolean)
+      );
+
+      // Find main class for CustomFileInputStream generation
+      const mainJavaFile = newFiles.find(f => 
+        f.filename.endsWith('.java') && 
+        (f.filename.includes('Main') || f.contents.includes('public static void main'))
+      );
+      const mainClassName = mainJavaFile ? 
+        mainJavaFile.filename.replace('.java', '') : 
+        'Main';
+
+      // Keep the CustomFileInputStream.java file (regenerate it for the new main class)
+      const updatedFiles = [
+        ...newFiles,
+        {
+          filename: 'CustomFileInputStream.java',
+          contents: generateCustomFileInputStream(mainClassName)
+        }
+      ];
+
+      setFiles(updatedFiles);
+      setActiveFile(newFiles[0]?.filename || 'Main.java');
+      
+      // Update project data with repo info
+      if (projectData) {
+        const updatedProject = {
+          ...projectData,
+          githubRepo: `${owner}/${repo}`,
+          lastModified: new Date().toISOString()
+        };
+        await saveProject(updatedProject);
+        setProjectData(updatedProject);
+      }
+      
+      setOutputLines(prev => [...prev, `Successfully pulled ${newFiles.length} file(s) from ${owner}/${repo}`]);
+    }
+  } catch (error: any) {
+    setOutputLines(prev => [...prev, `Pull error: ${error.message}`]);
+  }
+};
+
+const handleClone = async () => {
+  const token = localStorage.getItem('githubToken');
+  if (!cloneUrl) return;
+  
+  try {
+    // Extract owner/repo from URL
+    const match = cloneUrl.match(/github.com[/:](.+?)\/(.+?)(?:\.git)?$/);
+    if (!match) throw new Error('Invalid GitHub URL');
+    
+    const [_, owner, repo] = match;
+    
+    const octokit = token ? new Octokit({ auth: token }) : new Octokit();
+    
+    const { data: contents } = await octokit.repos.getContent({
+      owner,
+      repo,
+      path: '',
+    });
+
+    if (Array.isArray(contents)) {
+      const newFiles = await Promise.all(
+        contents.map(async (file: any) => {
+          // Clone all files, not just .java files
+          if (file.type === 'file') {
+            const { data: fileContent } = await octokit.repos.getContent({
+              owner,
+              repo,
+              path: file.path,
+            });
+            //@ts-ignore
+            const content = fileContent.content ? 
+            //@ts-ignore
+              atob(fileContent.content.replace(/\s/g, '')) : 
+              await (await fetch(file.download_url)).text();
+            
+            return {
+              filename: file.name,
+              contents: content
+            };
+          }
+          return null;
+        }).filter(Boolean)
+      );
+
+      // Find main class for CustomFileInputStream generation
+      const mainJavaFile = newFiles.find(f => 
+        f.filename.endsWith('.java') && 
+        (f.filename.includes('Main') || f.contents.includes('public static void main'))
+      );
+      const mainClassName = mainJavaFile ? 
+        mainJavaFile.filename.replace('.java', '') : 
+        'Main';
+
+      const updatedFiles = [
+        ...newFiles,
+        {
+          filename: 'CustomFileInputStream.java',
+          contents: generateCustomFileInputStream(mainClassName)
+        }
+      ];
+
+      setFiles(updatedFiles);
+      setActiveFile(newFiles[0]?.filename || 'Main.java');
+      
+      // Update project data with cloned repo info
+      if (projectData) {
+        const updatedProject = {
+          ...projectData,
+          githubRepo: `${owner}/${repo}`,
+          lastModified: new Date().toISOString()
+        };
+        await saveProject(updatedProject);
+        setProjectData(updatedProject);
+      }
+      
+      setShowCloneModal(false);
+      setCloneUrl("");
+      setOutputLines(prev => [...prev, `Successfully cloned ${newFiles.length} file(s) from ${owner}/${repo}`]);
+    }
+  } catch (error: any) {
+    setOutputLines(prev => [...prev, `Clone error: ${error.message}`]);
+  }
+};
 
   const saveProjectToDB = async () => {
     if (!projectData) return;
@@ -324,7 +658,7 @@ public class CustomFileInputStream extends InputStream {
     }
   }, []);
 
-  const getInput = () => {
+  const getInput = () => {//@ts-ignore
     return new Promise<string>((resolve) => {
       const checkKeyPress = (e: KeyboardEvent) => {
         if (e.key === 'Enter') {
@@ -390,7 +724,7 @@ public class CustomFileInputStream extends InputStream {
             // block until the textbox has content
             String cInpStr = getCurrentInputString();
             if (cInpStr.length() != 0) {
-                // read the textbox as bytes
+                // read the textbox as bytes//@ts-ignore
                 byte[] data = cInpStr.getBytes();
                 int len = Math.min(l - o, data.length);
                 System.arraycopy(data, 0, b, o, len);
@@ -711,6 +1045,71 @@ public class CustomFileInputStream extends InputStream {
         "h-screen"
       )}
     >
+      {/* GitHub Token Modal */}
+      {showTokenModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-neutral-800 rounded-lg p-6 max-w-md w-full">
+            <h3 className="font-bold text-lg mb-4">GitHub Access Token</h3>
+            <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+              Create a personal access token with <code>repo</code> scope from GitHub Settings
+            </p>
+            <input
+              type="password"
+              placeholder="Enter GitHub Personal Access Token"
+              className="w-full p-2 border rounded mb-4 dark:bg-neutral-700 dark:border-neutral-600"
+              onChange={(e) => localStorage.setItem('githubToken', e.target.value)}
+            />
+            <div className="flex justify-end gap-2">
+              <button 
+                className="px-4 py-2 border rounded dark:border-neutral-600"
+                onClick={() => setShowTokenModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="px-4 py-2 bg-[#6A4028] text-white rounded"
+                onClick={() => {
+                  setGithubToken(localStorage.getItem('githubToken'));
+                  setShowTokenModal(false);
+                }}
+              >
+                Save Token
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clone Repository Modal */}
+      {showCloneModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-neutral-800 rounded-lg p-6 max-w-md w-full">
+            <h3 className="font-bold text-lg mb-4">Clone Repository</h3>
+            <input
+              type="text"
+              placeholder="https://github.com/user/repo.git"
+              className="w-full p-2 border rounded mb-4 dark:bg-neutral-700 dark:border-neutral-600"
+              value={cloneUrl}
+              onChange={(e) => setCloneUrl(e.target.value)}
+            />
+            <div className="flex justify-end gap-2">
+              <button 
+                className="px-4 py-2 border rounded dark:border-neutral-600"
+                onClick={() => setShowCloneModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="px-4 py-2 bg-[#6A4028] text-white rounded"
+                onClick={handleClone}
+              >
+                Clone
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Sidebar open={open} setOpen={setOpen}>
         <SidebarBody className="justify-between gap-10 bg-slate-900">
           <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden ml-1 mb-2 pb-6">
@@ -812,9 +1211,6 @@ public class CustomFileInputStream extends InputStream {
           </div>
 
           <div className="space-y-4 flex-shrink-0">
-            <div className="flex  items-center space-x-2 mb-4">
-            </div>
-
             <div className="grid grid-cols-2 gap-3">
               <button
                 className="rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
@@ -854,6 +1250,36 @@ public class CustomFileInputStream extends InputStream {
                   className="hidden"
                 />
               </label>
+            </div>
+
+            {/* GitHub Integration Buttons */}
+            <div className="mt-4 flex flex-col gap-3">
+              <button
+                className="rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
+                onClick={handlePush}
+                disabled={!cheerpjLoaded}
+              >
+                <IconBrandGithub className="w-4 h-4" />
+                <span className="text-sm">Push to GitHub</span>
+              </button>
+              
+              <button
+                className="rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
+                onClick={handlePull}
+                disabled={!cheerpjLoaded || !projectData?.githubRepo}
+              >
+                <IconBrandGithub className="w-4 h-4" />
+                <span className="text-sm">Pull from GitHub</span>
+              </button>
+              
+              <button
+                className="rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
+                onClick={() => setShowCloneModal(true)}
+                disabled={!cheerpjLoaded}
+              >
+                <IconBrandGithub className="w-4 h-4" />
+                <span className="text-sm">Clone Repository</span>
+              </button>
             </div>
 
             {/* Save button */}
