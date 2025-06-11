@@ -1,207 +1,44 @@
+// page.tsx
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
-import { Edit3, Play, Trash2, Plus, Download, Upload, Loader, Search, Terminal, Code } from 'lucide-react';
-import { IconCode, IconFolder, IconBrandGithub } from '@tabler/icons-react';
+import { Loader } from 'lucide-react';
 import dynamic from 'next/dynamic';
-
-const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
-  ssr: false,
-  loading: () => <div className="w-full h-full bg-neutral-900 flex items-center justify-center">
-    <Loader className="animate-spin text-blue-500" />
-  </div>
-});
+import { ResizableSidebar } from './components/ResizableSidebar';
+import { EditorPanel } from './components/EditorPanel';
+import { File } from './components/FileTreeItem';
+import { getProject, saveProject } from './db';
 
 declare global {
   interface Window {
-    loadPyodide: any;
-    pyodide: any;
+    loadPyodide: (config?: {
+      indexURL?: string;
+      stdout?: (text: string) => void;
+      stderr?: (text: string) => void;
+    }) => Promise<PyodideInterface>;
+    pyodide: PyodideInterface;
   }
 }
 
-interface File {
-  filename: string;
-  contents: string;
-  isFolder?: boolean;
-  parentFolder?: string;
-  path?: string;
+interface PyodideInterface {
+  runPython: (code: string) => any;
+  loadPackage: (packageName: string | string[]) => Promise<void>;
+  FS: {
+    writeFile: (path: string, data: string) => void;
+    readFile: (path: string, options?: { encoding?: string }) => string | Uint8Array;
+    mkdirTree: (path: string) => void;
+    mkdir: (path: string) => void;
+    unlink: (path: string) => void;
+    rmdir: (path: string) => void;
+  };
+  globals: {
+    get: (name: string) => any;
+    set: (name: string, value: any) => void;
+  };
+  toPy: (obj: any) => any;
+  toJs: (obj: any) => any;
 }
 
-const DB_NAME = 'PythonProjectsDB';
-const DB_VERSION = 1;
-const STORE_NAME = 'projects';
-
-const openDB = () => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-
-    request.onupgradeneeded = (event) => {
-
-      const db = (event.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-        store.createIndex('name', 'name', { unique: false });
-        store.createIndex('lastModified', 'lastModified', { unique: false });
-      }
-    };
-  });
-};
-
-const getProject = async (id) => {
-  const db = await openDB();
-  // @ts-ignore
-  const transaction = db.transaction([STORE_NAME], 'readonly');
-  const store = transaction.objectStore(STORE_NAME);
-  return new Promise((resolve, reject) => {
-    const request = store.get(id);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-};
-
-const saveProject = async (project) => {
-  const db = await openDB();
-  // @ts-ignore
-  const transaction = db.transaction([STORE_NAME], 'readwrite');
-  const store = transaction.objectStore(STORE_NAME);
-  return store.put(project);
-};
-
-
 const PythonIDE = () => {
-
-  const FileTreeItem = ({ file, level = 0 }: { file: File; level?: number }) => {
-    const children = getChildren(file.filename, files);
-    const [isExpanded, setIsExpanded] = useState(true);
-    const [isRenaming, setIsRenaming] = useState(false);
-    const [newName, setNewName] = useState(file.filename);
-    const renameInputRef = useRef<HTMLInputElement>(null);
-
-    const handleRename = () => {
-      if (newName && newName !== file.filename) {
-        const updatedFiles = files.map(f => {
-          if (f.path === file.path) {
-            const updatedFile = {
-              ...f,
-              filename: newName,
-              path: file.parentFolder ? `${file.parentFolder}/${newName}` : newName
-            };
-
-            if (file.isFolder) {
-              return {
-                ...updatedFile,
-                path: file.parentFolder ? `${file.parentFolder}/${newName}` : newName
-              };
-            }
-            return updatedFile;
-          }
-          return f;
-        });
-
-        // Update paths for folder contents if this is a folder
-        if (file.isFolder) {
-          const oldPath = file.path || '';
-          const newPath = file.parentFolder ? `${file.parentFolder}/${newName}` : newName;
-          setFiles(updateChildPaths(updatedFiles, oldPath, newPath));
-        } else {
-          setFiles(updatedFiles);
-        }
-      }
-      setIsRenaming(false);
-    };
-
-    return (
-      <div key={file.path} className="ml-2" style={{ marginLeft: `${level * 12}px` }}>
-        <div className="flex items-center space-x-2 group">
-          {file.isFolder && (
-            <button
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="p-1 text-neutral-400 hover:text-white"
-            >
-              {isExpanded ? '▼' : '►'}
-            </button>
-          )}
-
-          {isRenaming ? (
-            <div className="flex-1 flex items-center">
-              <input
-                ref={renameInputRef}
-                type="text"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onBlur={handleRename}
-                onKeyDown={(e) => e.key === 'Enter' && handleRename()}
-                className="flex-1 bg-neutral-700 text-white px-2 py-1 rounded border border-blue-500"
-                autoFocus
-              />
-            </div>
-          ) : (
-            <>
-              <button
-                className={`flex-1 text-left px-2 py-2 rounded transition-all duration-200 flex items-center space-x-2 ${activeFile === file.path
-                  ? "bg-[#4a6741]/50 text-slate-200"
-                  : "text-neutral-400 hover:bg-neutral-800"
-                  }`}
-                onClick={() => !file.isFolder && setActiveFile(file.path!)}
-                draggable
-                onDragStart={(e) => handleDragStart(e, file.path!)}
-                onDragOver={(e) => {
-                  if (file.isFolder) {
-                    handleDragOver(e, file.filename);
-                  }
-                  e.preventDefault();
-                }}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => file.isFolder && handleDrop(e, file.filename)}
-              >
-                <div className="w-6 h-6 flex items-center justify-center">
-                  {file.isFolder ? (
-                    <IconFolder className="h-4 w-4 text-blue-400" />
-                  ) : (
-                    <IconCode className="h-4 w-4 text-green-400" />
-                  )}
-                </div>
-                <span className="font-mono text-sm truncate">
-                  {file.filename}
-                </span>
-              </button>
-
-              <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={() => {
-                    setIsRenaming(true);
-                    setNewName(file.filename);
-                  }}
-                  className="p-1 text-neutral-400 hover:text-blue-400"
-                  title="Rename"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => removeFile(file)}
-                  className="p-1 text-neutral-400 hover:text-red-400"
-                  title="Delete"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-
-        {isExpanded && file.isFolder && children.length > 0 && (
-          <div className="ml-4">
-            {children.map((child) => (
-              <FileTreeItem key={child.path} file={child} level={level + 1} />
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
   const [files, setFiles] = useState<File[]>([
     {
       filename: 'main.py',
@@ -253,38 +90,19 @@ print(f"Word count: {len(text.split())}")
   const [pyodideLoaded, setPyodideLoaded] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState('');
-  const outputRef = useRef<HTMLDivElement>(null);
-  const [sidebarWidth, setSidebarWidth] = useState(300);
-  const isResizing = useRef(false);
   const [packageInput, setPackageInput] = useState('');
   const [isInstalling, setIsInstalling] = useState(false);
   const [installedPackages, setInstalledPackages] = useState<string[]>([]);
-  const [showPackageManager, setShowPackageManager] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const editorRef = useRef<any>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [project, setProject] = useState<any>(null);
   const [draggedFile, setDraggedFile] = useState<string | null>(null);
   const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(300);
 
-  const commonPackages = [
-    'numpy', 'matplotlib', 'pandas', 'scipy', 'scikit-learn',
-    'micropip', 'pytz', 'packaging', 'pillow', 'requests'
-  ];
-
-
-
-  // Helper to get full file path
-  const getFullPath = (file: File) => {
-    return file.parentFolder ? `${file.parentFolder}/${file.filename}` : file.filename;
-  };
-
-  // Helper to find all children of a folder
   const getChildren = (folderName: string, allFiles: File[]) => {
     return allFiles.filter(f => f.parentFolder === folderName);
   };
 
-  // Helper to update paths recursively when a folder is renamed
   const updateChildPaths = (files: File[], oldPath: string, newPath: string) => {
     return files.map(f => {
       if (f.path?.startsWith(`${oldPath}/`)) {
@@ -314,13 +132,9 @@ print(f"Word count: {len(text.split())}")
         const projectData = await getProject(projectId);
         if (projectData) {
           setProject(projectData);
-          //@ts-ignore
           setFiles(projectData.files || []);
-          //@ts-ignore
           setInstalledPackages(projectData.installedPackages || []);
-          //@ts-ignore
           if (projectData.files?.length > 0) {
-            //@ts-ignore
             setActiveFile(projectData.files[0].filename);
           }
         }
@@ -350,7 +164,6 @@ print(f"Word count: {len(text.split())}")
     const timer = setTimeout(saveProjectData, 1000);
     return () => clearTimeout(timer);
   }, [files, installedPackages]);
-
 
   useEffect(() => {
     const loadPyodide = async () => {
@@ -444,7 +257,8 @@ output_capture = OutputCapture()
         try {
           await window.pyodide.loadPackage(pkg);
           setOutputLines(prev => [...prev, `Restored ${pkg}`]);
-        } catch (error) {//@ts-ignore
+        } catch (error) {
+          //@ts-ignore
           setOutputLines(prev => [...prev, `Failed to restore ${pkg}: ${error.message}`]);
         }
       }
@@ -473,7 +287,6 @@ output_capture = OutputCapture()
     setOutputLines([`Running ${activeFile}`, '']);
 
     try {
-      // Mount all files to the virtual filesystem
       files.forEach(file => {
         if (!file.isFolder) {
           const path = `/${file.path}`;
@@ -489,7 +302,6 @@ output_capture = OutputCapture()
         }
       });
 
-      // Set working directory to the active file's directory
       const activeDir = activeFileObj.path?.split('/').slice(0, -1).join('/') || '/';
       await window.pyodide.runPython(`
   import os
@@ -497,7 +309,6 @@ output_capture = OutputCapture()
   os.chdir("${activeDir}")
 `);
 
-      // Add the root directory to Python path
       await window.pyodide.runPython(`
 try:
     import sys
@@ -555,7 +366,6 @@ except Exception as e:
     let extension = '.py';
     let counter = 1;
 
-    // Check both root and target folder for existing files
     while (files.some(f =>
       f.filename === `${baseName}${counter}${extension}` &&
       f.parentFolder === parentFolder
@@ -609,7 +419,6 @@ except Exception as e:
       return;
     }
 
-    // If it's a folder, remove all its children
     if (file.isFolder) {
       const children = files.filter(f => f.path?.startsWith(`${file.path}/`));
       setFiles(files.filter(f => f.path !== file.path && !children.some(c => c.path === f.path)));
@@ -617,7 +426,6 @@ except Exception as e:
       setFiles(files.filter(f => f.path !== file.path));
     }
 
-    // If we're deleting the active file, switch to another file
     if (activeFile === file.path) {
       const remainingFiles = files.filter(f => f.path !== file.path);
       if (remainingFiles.length > 0) {
@@ -626,60 +434,8 @@ except Exception as e:
     }
   };
 
-  const renameFile = (file: File, newName: string) => {
-    if (!newName || newName === file.filename) return;
-
-    // Validate name
-    if (!file.isFolder && !newName.endsWith('.py')) {
-      newName += '.py';
-    }
-
-    // Check for duplicates
-    if (files.some(f =>
-      f.filename === newName &&
-      f.parentFolder === file.parentFolder &&
-      f.path !== file.path
-    )) {
-      alert("A file with that name already exists in this location.");
-      return;
-    }
-
-    const updatedFiles = files.map(f => {
-      if (f.path === file.path) {
-        const updatedFile = {
-          ...f,
-          filename: newName,
-          path: file.parentFolder ? `${file.parentFolder}/${newName}` : newName
-        };
-
-        if (file.isFolder) {
-          return {
-            ...updatedFile,
-            path: file.parentFolder ? `${file.parentFolder}/${newName}` : newName
-          };
-        }
-        return updatedFile;
-      }
-      return f;
-    });
-
-    // Update paths for folder contents if this is a folder
-    if (file.isFolder) {
-      const oldPath = file.path || '';
-      const newPath = file.parentFolder ? `${file.parentFolder}/${newName}` : newName;
-      setFiles(updateChildPaths(updatedFiles, oldPath, newPath));
-    } else {
-      setFiles(updatedFiles);
-    }
-
-    // Update active file if needed
-    if (activeFile === file.path) {
-      setActiveFile(file.parentFolder ? `${file.parentFolder}/${newName}` : newName);
-    }
-  };
-
   const handleExport = () => {
-    const file = files.find(f => f.path === activeFile); // Changed to path
+    const file = files.find(f => f.path === activeFile);
     if (!file) return alert("No file selected.");
 
     const blob = new Blob([file.contents], { type: 'text/plain' });
@@ -742,41 +498,8 @@ except Exception as e:
     }
 
     if (!installedPackages.includes(packageName)) {
-      const newPackages = [...installedPackages, packageName];
-      setInstalledPackages(newPackages);
+      setInstalledPackages(prev => [...prev, packageName]);
     }
-
-  };
-
-  const handlePackageSubmit = async (e: any) => {
-    e.preventDefault();
-    if (!packageInput.trim()) return;
-
-    await installPackage(packageInput);
-    setPackageInput('');
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    isResizing.current = true;
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    document.body.style.userSelect = 'none';
-  };
-
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isResizing.current) return;
-    const newWidth = e.clientX;
-    if (newWidth > 200 && newWidth < 500) {
-      setSidebarWidth(newWidth);
-    }
-    e.preventDefault();
-  };
-
-  const handleMouseUp = () => {
-    isResizing.current = false;
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
-    document.body.style.userSelect = 'auto';
   };
 
   const handleDragStart = (e: React.DragEvent, path: string) => {
@@ -813,259 +536,44 @@ except Exception as e:
     setDraggedFile(null);
   };
 
+  const editorRef = useRef<any>(null);
+  const outputRef = useRef<HTMLDivElement>(null);
+
   return (
     <div className="rounded-md flex flex-col md:flex-row bg-black w-full flex-1 border border-slate-800 overflow-hidden h-screen">
-      {/* Sidebar */}
-      <div
-        className="border-r border-neutral-700 bg-neutral-900 flex flex-col"
-        style={{ width: sidebarWidth }}
-      >
-        <div className="p-6 -mt-2 h-full flex flex-col overflow-hidden">
-          <div className="mb-4 flex-shrink-0 font-bold flex items-center gap-2 text-white">
-            Python IDE
-            {pyodideLoaded && (
-              <span className="text-xs font-normal text-green-400">● Ready</span>
-            )}
-          </div>
-
-          <div className="flex-1 overflow-y-auto space-y-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-neutral-600 hover:scrollbar-thumb-slate-500 scrollbar-thumb-rounded-full pb-4">
-            <div className="mb-4">
-              <h2 className="text-sm font-semibold text-gray-300 mb-2">Files</h2>
-              <div className="space-y-1">
-                {files
-                  .filter(f => !f.parentFolder)
-                  .map((file) => (
-                    <FileTreeItem key={file.path} file={file} />
-                  ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4 flex-shrink-0">
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                className="rounded-lg py-3 px-4 bg-[#304529] hover:bg-[#4a6741] text-white font-medium transition-all duration-200 border border-slate-700 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
-                onClick={() => addFile()}
-              >
-                <Plus className="w-4 h-4" />
-                <span className="text-sm">New File</span>
-              </button>
-
-              <button
-                className="rounded-lg py-3 px-4 bg-[#304529] hover:bg-[#4a6741] text-white font-medium transition-all duration-200 border border-slate-700 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
-                onClick={() => addFolder()}
-              >
-                <IconFolder className="w-4 h-4" />
-                <span className="text-sm">New Folder</span>
-              </button>
-
-              <button
-                onClick={runCode}
-                disabled={!pyodideLoaded || isRunning}
-                className="rounded-lg py-3 px-4 bg-[#304529] hover:bg-[#4a6741] text-white font-medium transition-all duration-200 border border-slate-700 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
-              >
-                {isRunning ? (
-                  <Loader className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Play className="w-4 h-4" />
-                )}
-                <span className="text-sm">{isRunning ? 'Running...' : 'Run Code'}</span>
-              </button>
-
-              <button
-                className="rounded-lg py-3 px-4 bg-[#304529] hover:bg-[#4a6741] text-white font-medium transition-all duration-200 border border-slate-700 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
-              >
-                <IconBrandGithub className="w-4 h-4" />
-                <span className="text-sm">Git</span>
-              </button>
-
-              <button
-                onClick={handleExport}
-                className="rounded-lg py-3 px-4 bg-[#304529] hover:bg-[#4a6741] text-white font-medium transition-all duration-200 border border-slate-700 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
-              >
-                <Download className="w-4 h-4" />
-                <span className="text-sm">Export</span>
-              </button>
-
-              <label className="rounded-lg py-3 px-4 bg-[#304529] hover:bg-[#4a6741] text-white font-medium transition-all duration-200 border border-slate-700 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]">
-                <Upload className="w-4 h-4" />
-                <span className="text-sm">Import</span>
-                <input
-                  type="file"
-                  accept=".py"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-              </label>
-            </div>
-
-            {/* Package Installation */}
-            <div className="mt-4 pt-4 border-t border-gray-700">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold text-gray-300"> Packages</h3>
-                <button
-                  onClick={() => setShowPackageManager(!showPackageManager)}
-                  className="text-xs flex items-center gap-1 bg-neutral-800 hover:bg-neutral-700 px-2 py-1 rounded text-neutral-300 border border-neutral-700"
-                >
-                  <Terminal className="h-3 w-3" />
-                  {showPackageManager ? 'Hide' : 'Show'}
-                </button>
-              </div>
-
-              {showPackageManager ? (
-                <div className="space-y-3">
-                  <div className="flex gap-2 mb-3">
-                    <input
-                      type="text"
-                      value={packageInput}
-                      onChange={(e) => setPackageInput(e.target.value)}
-                      placeholder="Package name"
-                      className="flex-1 bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-sm text-white"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handlePackageSubmit(e);
-                        }
-                      }}
-                    />
-                    <button
-                      onClick={handlePackageSubmit}
-                      disabled={!pyodideLoaded || isInstalling || !packageInput.trim()}
-                      className="px-3 py-1 bg-[#304529] hover:bg-[#4a6741] text-white rounded text-sm disabled:opacity-50"
-                    >
-                      {isInstalling ? (
-                        <Loader className="h-4 w-4 animate-spin mx-auto" />
-                      ) : 'Install'}
-                    </button>
-                  </div>
-
-                  <div className="text-xs text-neutral-400 mb-2">Common packages:</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {commonPackages.map(pkg => (
-                      <button
-                        key={pkg}
-                        onClick={() => installPackage(pkg)}
-                        disabled={!pyodideLoaded || isInstalling || installedPackages.includes(pkg)}
-                        className="text-center p-2 text-xs bg-neutral-800 hover:bg-neutral-700 disabled:bg-neutral-900 disabled:opacity-50 rounded border border-neutral-700 hover:border-neutral-600"
-                      >
-                        {installedPackages.includes(pkg) ? '' : ''}
-                        {pkg}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 gap-2">
-                  {['numpy', 'matplotlib', 'pandas'].map(pkg => (
-                    <button
-                      key={pkg}
-                      onClick={() => installPackage(pkg)}
-                      disabled={!pyodideLoaded || isInstalling || installedPackages.includes(pkg)}
-                      className="text-center p-2 text-xs bg-neutral-800 hover:bg-neutral-700 disabled:bg-neutral-900 disabled:opacity-50 rounded border border-neutral-700"
-                    >
-                      {installedPackages.includes(pkg) ? pkg : pkg}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {!pyodideLoaded && (
-            <div className="mt-4 p-3 bg-yellow-900 border border-yellow-700 rounded-lg">
-              <div className="flex items-center space-x-2">
-                <Loader className="h-4 w-4 animate-spin text-yellow-400" />
-                <span className="text-sm text-yellow-400">Loading Python runtime</span>
-              </div>
-              {loadingProgress && (
-                <div className="mt-1 text-xs text-yellow-300">{loadingProgress}</div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Resize handle */}
-      <div
-        className="w-1 h-full bg-neutral-600 cursor-col-resize hover:bg-slate-300 transition-all duration-200"
-        onMouseDown={handleMouseDown}
+      <ResizableSidebar
+        sidebarWidth={sidebarWidth}
+        setSidebarWidth={setSidebarWidth}
+        files={files}
+        setFiles={setFiles}
+        activeFile={activeFile}
+        setActiveFile={setActiveFile}
+        addFile={addFile}
+        addFolder={addFolder}
+        removeFile={removeFile}
+        runCode={runCode}
+        isRunning={isRunning}
+        pyodideLoaded={pyodideLoaded}
+        handleExport={handleExport}
+        handleFileUpload={handleFileUpload}
+        handleDragStart={handleDragStart}
+        handleDragOver={handleDragOver}
+        handleDragLeave={handleDragLeave}
+        handleDrop={handleDrop}
+        getChildren={getChildren}
+        installedPackages={installedPackages}
+        installPackage={installPackage}
+        loadingProgress={loadingProgress}
       />
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Editor Header */}
-        <div className="bg-neutral-800 p-3 border-b border-neutral-700">
-          <p className="font-mono text-sm text-neutral-300 flex items-center gap-2">
-            <Code className="h-4 w-4" />
-            {activeFile}
-          </p>
-        </div>
-
-        {/* Monaco Editor */}
-        <div className="flex-1">
-          <MonacoEditor
-            language="python"
-            value={files.find(f => f.path === activeFile)?.contents ?? ''}
-            onChange={handleEditorChange}
-            onMount={handleEditorDidMount}
-            theme="vs-dark"
-            options={{
-              automaticLayout: true,
-              fontSize: 14,
-              fontFamily: 'Monaco, Menlo, "Ubuntu Mono", Consolas, monospace',
-              minimap: { enabled: false },
-              scrollBeyondLastLine: false,
-              lineNumbers: 'on',
-              roundedSelection: false,
-              padding: { top: 15 },
-              scrollbar: {
-                vertical: 'auto',
-                horizontal: 'auto',
-              },
-              tabSize: 4,
-            }}
-          />
-        </div>
-
-        {/* Output Panel */}
-        <div className="h-64 flex flex-col border-t border-neutral-700">
-          <div className="bg-neutral-800 p-2 flex items-center justify-between border-b border-neutral-700">
-            <span className="text-sm font-semibold text-neutral-300 flex items-center gap-2">
-              <Terminal className="h-4 w-4" />
-              Output
-            </span>
-            <button
-              onClick={clearOutput}
-              className="text-xs bg-neutral-700 hover:bg-neutral-600 px-2 py-1 rounded text-neutral-300 border border-neutral-600"
-            >
-              Clear
-            </button>
-          </div>
-          <div
-            ref={outputRef}
-            className="flex-1 bg-black p-3 overflow-y-auto font-mono text-sm whitespace-pre-wrap scrollbar-thin scrollbar-track-transparent scrollbar-thumb-neutral-700"
-          >
-            {outputLines.length > 0 ? (
-              outputLines.map((line, index) => (
-                <div
-                  key={index}
-                  className={
-                    line.startsWith('❌') || line.startsWith('Error:')
-                      ? 'text-red-400'
-                      : line.startsWith('✅') || line.startsWith('🚀') || line.startsWith('📦')
-                        ? 'text-slate-400'
-                        : 'text-white'
-                  }
-                >
-                  {line || '\u00A0'}
-                </div>
-              ))
-            ) : (
-              <div className="text-neutral-600">Output will appear here...</div>
-            )}
-          </div>
-        </div>
-      </div>
+      <EditorPanel
+        activeFile={activeFile}
+        files={files}
+        handleEditorChange={handleEditorChange}
+        handleEditorDidMount={handleEditorDidMount}
+        outputLines={outputLines}
+        clearOutput={clearOutput}
+      />
     </div>
   );
 };
