@@ -85,7 +85,7 @@ print(f"Word count: {len(text.split())}")
     },
   ]);
 
-  const [activeFile, setActiveFile] = useState('main.py');
+  const [activeFile, setActiveFile] = useState(files[0].path);
   const [outputLines, setOutputLines] = useState<string[]>([]);
   const [pyodideLoaded, setPyodideLoaded] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -135,7 +135,7 @@ print(f"Word count: {len(text.split())}")
           setFiles(projectData.files || []);
           setInstalledPackages(projectData.installedPackages || []);
           if (projectData.files?.length > 0) {
-            setActiveFile(projectData.files[0].filename);
+            setActiveFile(projectData.files[0].path);
           }
         }
       } catch (error) {
@@ -388,8 +388,18 @@ except Exception as e:
   };
 
   const addFolder = (parentFolder?: string) => {
+    const existingFolders = files.filter(
+    f => f.isFolder && f.parentFolder === parentFolder
+  );
+  const existingNumbers = existingFolders.map(f => {
+    const match = f.filename.match(/folder(\d+)/);
+    return match ? parseInt(match[1]) : 0;
+  });
     let baseName = 'folder';
     let counter = 1;
+  while (existingNumbers.includes(counter)) {
+    counter++;
+  }
 
     while (files.some(f =>
       f.filename === `${baseName}${counter}` &&
@@ -492,6 +502,7 @@ except Exception as e:
         setInstalledPackages(prev => [...prev, packageName]);
       }
     } catch (error: any) {
+      setInstalledPackages(prev => prev.filter(p => p !== packageName));
       setOutputLines(prev => [...prev, `Failed to install ${packageName}: ${error.message}`]);
     } finally {
       setIsInstalling(false);
@@ -501,6 +512,12 @@ except Exception as e:
       setInstalledPackages(prev => [...prev, packageName]);
     }
   };
+
+  const uninstallPackage = (packageName: string) => {
+  setInstalledPackages(prev => prev.filter(p => p !== packageName));
+  setOutputLines(prev => [...prev, `➖ Uninstalled ${packageName}`]);
+};
+
 
   const handleDragStart = (e: React.DragEvent, path: string) => {
     setDraggedFile(path);
@@ -564,6 +581,7 @@ except Exception as e:
         installedPackages={installedPackages}
         installPackage={installPackage}
         loadingProgress={loadingProgress}
+        uninstallPackage={uninstallPackage}
       />
 
       <EditorPanel

@@ -28,6 +28,7 @@ interface ResizableSidebarProps {
   installedPackages: string[];
   installPackage: (packageName: string) => Promise<void>;
   loadingProgress: string;
+  uninstallPackage: (packageName: string) => void;
 }
 
 export const ResizableSidebar: React.FC<ResizableSidebarProps> = ({
@@ -53,6 +54,7 @@ export const ResizableSidebar: React.FC<ResizableSidebarProps> = ({
   installedPackages,
   installPackage,
   loadingProgress,
+  uninstallPackage,
 }) => {
   const isResizing = useRef(false);
 
@@ -109,6 +111,7 @@ export const ResizableSidebar: React.FC<ResizableSidebarProps> = ({
           pyodideLoaded={pyodideLoaded}
           installPackage={installPackage}
           installedPackages={installedPackages}
+          uninstallPackage={uninstallPackage}
         />
 
         {!pyodideLoaded && (
