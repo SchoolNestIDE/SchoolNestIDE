@@ -23,6 +23,7 @@ interface File {
   contents: string;
   isFolder?: boolean;
   parentFolder?: string;
+  path?: string;
 }
 
 const DB_NAME = 'PythonProjectsDB';
@@ -37,8 +38,8 @@ const openDB = () => {
     request.onsuccess = () => resolve(request.result);
 
     request.onupgradeneeded = (event) => {
-      // @ts-ignore
-      const db = event.target.result;
+
+      const db = (event.target as IDBOpenDBRequest).result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
         store.createIndex('name', 'name', { unique: false });
@@ -70,6 +71,137 @@ const saveProject = async (project) => {
 
 
 const PythonIDE = () => {
+
+  const FileTreeItem = ({ file, level = 0 }: { file: File; level?: number }) => {
+    const children = getChildren(file.filename, files);
+    const [isExpanded, setIsExpanded] = useState(true);
+    const [isRenaming, setIsRenaming] = useState(false);
+    const [newName, setNewName] = useState(file.filename);
+    const renameInputRef = useRef<HTMLInputElement>(null);
+
+    const handleRename = () => {
+      if (newName && newName !== file.filename) {
+        const updatedFiles = files.map(f => {
+          if (f.path === file.path) {
+            const updatedFile = {
+              ...f,
+              filename: newName,
+              path: file.parentFolder ? `${file.parentFolder}/${newName}` : newName
+            };
+
+            if (file.isFolder) {
+              return {
+                ...updatedFile,
+                path: file.parentFolder ? `${file.parentFolder}/${newName}` : newName
+              };
+            }
+            return updatedFile;
+          }
+          return f;
+        });
+
+        // Update paths for folder contents if this is a folder
+        if (file.isFolder) {
+          const oldPath = file.path || '';
+          const newPath = file.parentFolder ? `${file.parentFolder}/${newName}` : newName;
+          setFiles(updateChildPaths(updatedFiles, oldPath, newPath));
+        } else {
+          setFiles(updatedFiles);
+        }
+      }
+      setIsRenaming(false);
+    };
+
+    return (
+      <div key={file.path} className="ml-2" style={{ marginLeft: `${level * 12}px` }}>
+        <div className="flex items-center space-x-2 group">
+          {file.isFolder && (
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="p-1 text-neutral-400 hover:text-white"
+            >
+              {isExpanded ? '▼' : '►'}
+            </button>
+          )}
+
+          {isRenaming ? (
+            <div className="flex-1 flex items-center">
+              <input
+                ref={renameInputRef}
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onBlur={handleRename}
+                onKeyDown={(e) => e.key === 'Enter' && handleRename()}
+                className="flex-1 bg-neutral-700 text-white px-2 py-1 rounded border border-blue-500"
+                autoFocus
+              />
+            </div>
+          ) : (
+            <>
+              <button
+                className={`flex-1 text-left px-2 py-2 rounded transition-all duration-200 flex items-center space-x-2 ${activeFile === file.path
+                  ? "bg-[#4a6741]/50 text-slate-200"
+                  : "text-neutral-400 hover:bg-neutral-800"
+                  }`}
+                onClick={() => !file.isFolder && setActiveFile(file.path!)}
+                draggable
+                onDragStart={(e) => handleDragStart(e, file.path!)}
+                onDragOver={(e) => {
+                  if (file.isFolder) {
+                    handleDragOver(e, file.filename);
+                  }
+                  e.preventDefault();
+                }}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => file.isFolder && handleDrop(e, file.filename)}
+              >
+                <div className="w-6 h-6 flex items-center justify-center">
+                  {file.isFolder ? (
+                    <IconFolder className="h-4 w-4 text-blue-400" />
+                  ) : (
+                    <IconCode className="h-4 w-4 text-green-400" />
+                  )}
+                </div>
+                <span className="font-mono text-sm truncate">
+                  {file.filename}
+                </span>
+              </button>
+
+              <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={() => {
+                    setIsRenaming(true);
+                    setNewName(file.filename);
+                  }}
+                  className="p-1 text-neutral-400 hover:text-blue-400"
+                  title="Rename"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => removeFile(file)}
+                  className="p-1 text-neutral-400 hover:text-red-400"
+                  title="Delete"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        {isExpanded && file.isFolder && children.length > 0 && (
+          <div className="ml-4">
+            {children.map((child) => (
+              <FileTreeItem key={child.path} file={child} level={level + 1} />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const [files, setFiles] = useState<File[]>([
     {
       filename: 'main.py',
@@ -102,6 +234,18 @@ print(f"Uppercase: {text.upper()}")
 print(f"Word count: {len(text.split())}")
 `,
     },
+    {
+      filename: 'test',
+      contents: '',
+      isFolder: true,
+      path: 'test'
+    },
+    {
+      filename: 'importTest.py',
+      contents: `def hello_world():\n    print("Hello from imported module!")`,
+      parentFolder: 'test',
+      path: 'test/importTest.py'
+    },
   ]);
 
   const [activeFile, setActiveFile] = useState('main.py');
@@ -127,6 +271,32 @@ print(f"Word count: {len(text.split())}")
     'numpy', 'matplotlib', 'pandas', 'scipy', 'scikit-learn',
     'micropip', 'pytz', 'packaging', 'pillow', 'requests'
   ];
+
+
+
+  // Helper to get full file path
+  const getFullPath = (file: File) => {
+    return file.parentFolder ? `${file.parentFolder}/${file.filename}` : file.filename;
+  };
+
+  // Helper to find all children of a folder
+  const getChildren = (folderName: string, allFiles: File[]) => {
+    return allFiles.filter(f => f.parentFolder === folderName);
+  };
+
+  // Helper to update paths recursively when a folder is renamed
+  const updateChildPaths = (files: File[], oldPath: string, newPath: string) => {
+    return files.map(f => {
+      if (f.path?.startsWith(`${oldPath}/`)) {
+        return {
+          ...f,
+          path: f.path.replace(oldPath, newPath),
+          parentFolder: f.parentFolder?.replace(oldPath, newPath)
+        };
+      }
+      return f;
+    });
+  };
 
   useEffect(() => {
     const queryParams = new URLSearchParams(window.location.search);
@@ -293,8 +463,8 @@ output_capture = OutputCapture()
       return;
     }
 
-    const activeFileContent = files.find(f => f.filename === activeFile)?.contents;
-    if (!activeFileContent || !activeFileContent.trim()) {
+    const activeFileObj = files.find(f => f.path === activeFile);
+    if (!activeFileObj || !activeFileObj.contents.trim()) {
       setOutputLines(['No file selected or file is empty']);
       return;
     }
@@ -303,11 +473,38 @@ output_capture = OutputCapture()
     setOutputLines([`Running ${activeFile}`, '']);
 
     try {
+      // Mount all files to the virtual filesystem
+      files.forEach(file => {
+        if (!file.isFolder) {
+          const path = `/${file.path}`;
+          try {
+            const dirPath = path.split('/').slice(0, -1).join('/');
+            if (dirPath) {
+              window.pyodide.FS.mkdirTree(dirPath);
+            }
+            window.pyodide.FS.writeFile(path, file.contents);
+          } catch (e) {
+            console.error(`Error writing file ${path}:`, e);
+          }
+        }
+      });
+
+      // Set working directory to the active file's directory
+      const activeDir = activeFileObj.path?.split('/').slice(0, -1).join('/') || '/';
+      await window.pyodide.runPython(`
+  import os
+  os.makedirs("${activeDir}", exist_ok=True)
+  os.chdir("${activeDir}")
+`);
+
+      // Add the root directory to Python path
       await window.pyodide.runPython(`
 try:
+    import sys
+    sys.path.append("/")
     stdout_redirect, stderr_redirect = output_capture.capture()
     with stdout_redirect, stderr_redirect:
-${activeFileContent.split('\n').map(line => `        ${line}`).join('\n')}
+${activeFileObj.contents.split('\n').map(line => `        ${line}`).join('\n')}
 except Exception as e:
     import traceback
     print(f"Error: {e}")
@@ -347,102 +544,143 @@ except Exception as e:
   };
 
   const handleEditorChange = (value: string | undefined) => {
-    const newValue = value || '';
-    const newFiles = files.map(file =>
-      file.filename === activeFile
-        ? { ...file, contents: newValue }
-        : file
+    const newFiles = files.map(f =>
+      f.path === activeFile ? { ...f, contents: value || '' } : f
     );
     setFiles(newFiles);
   };
 
-  const addFile = () => {
+  const addFile = (parentFolder?: string) => {
     let baseName = 'script';
     let extension = '.py';
     let counter = 1;
 
-    while (files.some(f => f.filename === `${baseName}${counter}${extension}`)) {
+    // Check both root and target folder for existing files
+    while (files.some(f =>
+      f.filename === `${baseName}${counter}${extension}` &&
+      f.parentFolder === parentFolder
+    )) {
       counter++;
     }
 
     const newFileName = `${baseName}${counter}${extension}`;
+    const newPath = parentFolder ? `${parentFolder}/${newFileName}` : newFileName;
+
     const newFile = {
       filename: newFileName,
-      contents: `# New Python file
-print("Hello from ${newFileName}!")
-
-# Add your code here
-`,
+      contents: `# New Python file\nprint("Hello from ${newFileName}!")`,
+      parentFolder,
+      path: newPath
     };
 
-    setFiles([...files, newFile]);
-    setActiveFile(newFileName);
-
+    setFiles(prev => [...prev, newFile]);
+    setActiveFile(newPath);
   };
 
-  const addFolder = () => {
+  const addFolder = (parentFolder?: string) => {
     let baseName = 'folder';
     let counter = 1;
 
-    while (files.some(f => f.filename === `${baseName}${counter}` && f.isFolder)) {
+    while (files.some(f =>
+      f.filename === `${baseName}${counter}` &&
+      f.isFolder &&
+      f.parentFolder === parentFolder
+    )) {
       counter++;
     }
 
     const newFolderName = `${baseName}${counter}`;
+    const newPath = parentFolder ? `${parentFolder}/${newFolderName}` : newFolderName;
+
     const newFolder = {
       filename: newFolderName,
       contents: '',
       isFolder: true,
+      parentFolder,
+      path: newPath
     };
 
     setFiles([...files, newFolder]);
   };
 
-
-
-  const removeFile = (fileName: string) => {
-    if (files.length === 1) {
+  const removeFile = (file: File) => {
+    if (files.length <= 1) {
       alert("Cannot delete the last file");
       return;
     }
 
-    const newFiles = files.filter(f => f.filename !== fileName);
-    setFiles(newFiles);
+    // If it's a folder, remove all its children
+    if (file.isFolder) {
+      const children = files.filter(f => f.path?.startsWith(`${file.path}/`));
+      setFiles(files.filter(f => f.path !== file.path && !children.some(c => c.path === f.path)));
+    } else {
+      setFiles(files.filter(f => f.path !== file.path));
+    }
 
-    if (activeFile === fileName && newFiles.length > 0) {
-      setActiveFile(newFiles[0].filename);
+    // If we're deleting the active file, switch to another file
+    if (activeFile === file.path) {
+      const remainingFiles = files.filter(f => f.path !== file.path);
+      if (remainingFiles.length > 0) {
+        setActiveFile(remainingFiles[0].path!);
+      }
     }
   };
 
-  const renameFile = (oldFileName: string, newFileName: string) => {
-    const file = files.find(f => f.filename === oldFileName);
-    if (!file?.isFolder && !newFileName.endsWith('.py')) {
-      newFileName += '.py';
+  const renameFile = (file: File, newName: string) => {
+    if (!newName || newName === file.filename) return;
+
+    // Validate name
+    if (!file.isFolder && !newName.endsWith('.py')) {
+      newName += '.py';
     }
 
-    if (files.some(f => f.filename === newFileName)) {
-      alert("A file with that name already exists.");
+    // Check for duplicates
+    if (files.some(f =>
+      f.filename === newName &&
+      f.parentFolder === file.parentFolder &&
+      f.path !== file.path
+    )) {
+      alert("A file with that name already exists in this location.");
       return;
     }
 
-    const updatedFiles = files.map(f =>
-      f.filename === oldFileName
-        ? { ...f, filename: newFileName }
-        : f
-    );
-    setFiles(updatedFiles);
+    const updatedFiles = files.map(f => {
+      if (f.path === file.path) {
+        const updatedFile = {
+          ...f,
+          filename: newName,
+          path: file.parentFolder ? `${file.parentFolder}/${newName}` : newName
+        };
 
-    if (activeFile === oldFileName) {
-      setActiveFile(newFileName);
+        if (file.isFolder) {
+          return {
+            ...updatedFile,
+            path: file.parentFolder ? `${file.parentFolder}/${newName}` : newName
+          };
+        }
+        return updatedFile;
+      }
+      return f;
+    });
+
+    // Update paths for folder contents if this is a folder
+    if (file.isFolder) {
+      const oldPath = file.path || '';
+      const newPath = file.parentFolder ? `${file.parentFolder}/${newName}` : newName;
+      setFiles(updateChildPaths(updatedFiles, oldPath, newPath));
+    } else {
+      setFiles(updatedFiles);
+    }
+
+    // Update active file if needed
+    if (activeFile === file.path) {
+      setActiveFile(file.parentFolder ? `${file.parentFolder}/${newName}` : newName);
     }
   };
 
   const handleExport = () => {
-    const file = files.find(f => f.filename === activeFile);
-    if (!file) {
-      alert("No file selected.");
-      return;
-    }
+    const file = files.find(f => f.path === activeFile); // Changed to path
+    if (!file) return alert("No file selected.");
 
     const blob = new Blob([file.contents], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -541,8 +779,8 @@ print("Hello from ${newFileName}!")
     document.body.style.userSelect = 'auto';
   };
 
-  const handleDragStart = (e: React.DragEvent, filename: string) => {
-    setDraggedFile(filename);
+  const handleDragStart = (e: React.DragEvent, path: string) => {
+    setDraggedFile(path);
     e.dataTransfer.effectAllowed = 'move';
   };
 
@@ -561,15 +799,17 @@ print("Hello from ${newFileName}!")
   const handleDrop = (e: React.DragEvent, targetFolder?: string) => {
     e.preventDefault();
     setDragOverFolder(null);
-
     if (!draggedFile) return;
-
-    const updatedFiles = files.map(f =>
-      f.filename === draggedFile
-        ? { ...f, parentFolder: targetFolder }
-        : f
+    const draggedFileObj = files.find(f => f.path === draggedFile);
+    if (!draggedFileObj) return;
+    const newFiles = files.map(f =>
+      f.path === draggedFile ? {
+        ...f,
+        parentFolder: targetFolder,
+        path: targetFolder ? `${targetFolder}/${f.filename}` : f.filename
+      } : f
     );
-    setFiles(updatedFiles);
+    setFiles(newFiles);
     setDraggedFile(null);
   };
 
@@ -592,52 +832,11 @@ print("Hello from ${newFileName}!")
             <div className="mb-4">
               <h2 className="text-sm font-semibold text-gray-300 mb-2">Files</h2>
               <div className="space-y-1">
-                {files.map((file) => (
-                  <div key={file.filename} className="relative group">
-                    <div className="flex items-center space-x-2">
-                      <button
-                        className={`flex-1 text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center space-x-3 border ${activeFile === file.filename
-                          ? "bg-[#4a6741]/50 text-slate-200 border-slate-700"
-                          : "text-neutral-400 hover:bg-neutral-800 border-transparent hover:border-neutral-700"
-                          }`}
-                        onClick={() => setActiveFile(file.filename)}
-                      >
-                        <div className="w-8 h-8 bg-[#4a6741] rounded-lg flex items-center justify-center shadow-sm">
-                          {file.isFolder ? (
-                            <Search className="h-4 w-4 text-white" />
-                          ) : (
-                            <IconCode className="h-4 w-4 text-white" />
-                          )}
-                        </div>
-                        <span className="font-mono text-sm font-medium truncate flex-1">
-                          {file.filename}
-                        </span>
-                      </button>
-
-                      <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <button
-                          onClick={() => {
-                            const newName = prompt("Enter new filename:", file.filename);
-                            if (newName && newName !== file.filename) {
-                              renameFile(file.filename, newName);
-                            }
-                          }}
-                          className="p-2 bg-neutral-800 hover:bg-emerald-800 rounded-lg transition-all duration-200 border border-neutral-700 hover:border-slate-400"
-                          title="Rename file"
-                        >
-                          <Edit3 className="w-3.5 h-3.5 text-neutral-400 hover:text-white" />
-                        </button>
-                        <button
-                          onClick={() => removeFile(file.filename)}
-                          className="p-2 bg-neutral-800 hover:bg-red-600 rounded-lg transition-all duration-200 border border-neutral-700 hover:border-red-400"
-                          title="Delete file"
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-neutral-400 hover:text-white" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                {files
+                  .filter(f => !f.parentFolder)
+                  .map((file) => (
+                    <FileTreeItem key={file.path} file={file} />
+                  ))}
               </div>
             </div>
           </div>
@@ -646,7 +845,7 @@ print("Hello from ${newFileName}!")
             <div className="grid grid-cols-2 gap-3">
               <button
                 className="rounded-lg py-3 px-4 bg-[#304529] hover:bg-[#4a6741] text-white font-medium transition-all duration-200 border border-slate-700 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
-                onClick={addFile}
+                onClick={() => addFile()}
               >
                 <Plus className="w-4 h-4" />
                 <span className="text-sm">New File</span>
@@ -654,10 +853,10 @@ print("Hello from ${newFileName}!")
 
               <button
                 className="rounded-lg py-3 px-4 bg-[#304529] hover:bg-[#4a6741] text-white font-medium transition-all duration-200 border border-slate-700 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
-                onClick={addFolder}
+                onClick={() => addFolder()}
               >
                 <IconFolder className="w-4 h-4" />
-                <span className="text-sm">Folder</span>
+                <span className="text-sm">New Folder</span>
               </button>
 
               <button
@@ -806,7 +1005,7 @@ print("Hello from ${newFileName}!")
         <div className="flex-1">
           <MonacoEditor
             language="python"
-            value={files.find(f => f.filename === activeFile)?.contents ?? ''}
+            value={files.find(f => f.path === activeFile)?.contents ?? ''}
             onChange={handleEditorChange}
             onMount={handleEditorDidMount}
             theme="vs-dark"
