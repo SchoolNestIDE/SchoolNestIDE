@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from '@/app/(app)/lib/auth';
 import clientPromise from '@/app/lib/mongodb';
 import nodemailer from "nodemailer";
-import { emailTemplate } from '@/app/lib/emailTemplate';
+// import { emailTemplate } from '@/app/lib/emailTemplate';
 
 
 interface Data {

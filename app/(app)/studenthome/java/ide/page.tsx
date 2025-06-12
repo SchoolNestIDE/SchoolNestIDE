@@ -1,26 +1,34 @@
 "use client";
-
-import { Sidebar, SidebarBody, SidebarLink } from "@/app/components/ui/sidebar";
 import {
   IconArrowLeft,
   IconBrandTabler,
   IconSettings,
   IconUserBolt,
   IconCoffee,
+  IconPackage,
+  IconTemplate,
+  IconFileTypeJs,
+  IconCode,
+  IconTrash,
+  IconFolderDown,
+  IconLoader,
+  IconFileDownload,
+  IconUpload,
+  IconPlayerPlayFilled,
+  IconCloudUpload,
+  IconBrandGithub,
+  IconDeviceFloppy,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { cn } from "@/app/lib/utils";
-
 import React, { useEffect, useRef, useState } from 'react';
-import { useSession } from "next-auth/react";
 import dynamic from 'next/dynamic';
-import { get } from "http";
 import { useSearchParams } from "next/navigation";
+import { Code, Edit3, Play, Trash2 } from "lucide-react";
+import { Octokit } from "@octokit/rest";
 
-
-// Import MonacoEditor to avoid SSR issues
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
 declare global {
@@ -37,9 +45,57 @@ interface File {
 }
 
 interface Project {
-  project_name: string,
-  files: File[]
+  id: string;
+  name: string;
+  created: string;
+  lastModified: string;
+  files: File[];
+  githubRepo?: string;
 }
+
+const DB_NAME = 'JavaProjectsDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'projects';
+
+const openDB = () => {
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        store.createIndex('name', 'name', { unique: false });
+        store.createIndex('lastModified', 'lastModified', { unique: false });
+      }
+    };
+  });
+};
+
+const saveProject = async (project: Project) => {
+  const db = await openDB();
+  const transaction = db.transaction([STORE_NAME], 'readwrite');
+  const store = transaction.objectStore(STORE_NAME);
+  return new Promise<void>((resolve, reject) => {
+    const request = store.put(project);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+const getProject = async (id: string) => {
+  const db = await openDB();
+  const transaction = db.transaction([STORE_NAME], 'readonly');
+  const store = transaction.objectStore(STORE_NAME);
+  return new Promise<Project>((resolve, reject) => {
+    const request = store.get(id);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
 
 const Editor = () => {
   const [files, setFiles] = useState<File[]>([
@@ -49,10 +105,7 @@ const Editor = () => {
 
 public class Main {
     public static void main(String args[]) {
-        Scanner scan = new Scanner(System.in);
-        System.out.println("Enter an integer");
-        int a = scan.nextInt();
-        System.out.println("Your integer: " + a);
+        
     }
 }
 `,
@@ -122,17 +175,9 @@ public class CustomFileInputStream extends InputStream {
             // set the custom InputStream as the standard input
             System.setIn(new CustomFileInputStream());
 
-            // System.out.println(args[0]);
-            // Class<?> clazz = Class.forName(args[0]);
-            // Method method = clazz.getMethod("main", String[].class);
-            // method.invoke(null, (Object) new String[]{});
-
             // invoke main method in the user's main class
-            // Main clazz2 = new Main();
             Main.main(new String[0]);
 
-        // } catch (InvocationTargetException e) {
-        //     e.getTargetException().printStackTrace();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -147,116 +192,420 @@ public class CustomFileInputStream extends InputStream {
   const [cheerpjLoaded, setCheerpjLoaded] = useState(false);
   const inputFieldRef = useRef<HTMLInputElement>(null);
   const outputRef = useRef<HTMLDivElement>(null);
-
   const [showSystemFiles, setShowSystemFiles] = useState(false);
-
-  const [sidebarWidth, setSidebarWidth] = useState(250); // Initial sidebar width
+  const [sidebarWidth, setSidebarWidth] = useState(300);
   const isResizing = useRef(false);
   const monacoEditorRef = useRef<any>(null);
-
   const [open, setOpen] = useState(false);
-
   const searchParams = useSearchParams();
-  const projectFromUrl = searchParams.get("project") ?? "";
-
-  const [signedIn, setSignedIn] = useState(false);
-  const [name, setName] = useState('');
-  const [project, setProject] = useState(projectFromUrl);
-  const [projectList, setProjectList] = useState<string[]>([]);
-
-  const { data: session } = useSession();
-
-  const saveProject = async () => {
-    try {
-      const response = await fetch('/api/student/save_files/post', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ project, files })
-      });
-
-    } catch (errors: any) {
-      console.log(errors);
-    }
-  }
+  const projectId = searchParams.get("projectId") ?? "";
+  const [projectData, setProjectData] = useState<Project | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [outputHeight, setOutputHeight] = useState(200);
+  const [githubToken, setGithubToken] = useState<string | null>(null);
+  const [showTokenModal, setShowTokenModal] = useState(false);
+  const [showCloneModal, setShowCloneModal] = useState(false);
+  const [cloneUrl, setCloneUrl] = useState("");
 
   useEffect(() => {
-    if (session && session.user.role == 'student') {
-      setSignedIn(true);
-
-      const getStudentInfo = async () => {
-        const response = await fetch('/api/student/get_studentinfo/post', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-
-        const data = await response.json();
-
-        setName(data.firstname + ' ' + data.lastname);
-      }
-      getStudentInfo();
-
-      const getProjectFiles = async () => {
-        const response = await fetch('/api/student/get_files/post', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ project_name: project })
-        });
-
-        const data = await response.json();
-        // console.log(data.project);
-
-        if (data.project) {
-          setFiles(data.project.files);
-        } else {
-          alert('Project not found');
-        }
-
-      }
-
-      getProjectFiles();
-
-      const getProjects = async () => {
-        const response = await fetch('/api/student/get_projectlist/post', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-
-        const data = await response.json();
-
-        // console.log(data.java_project_names);
-
-        setProjectList(data.java_project_names);
-      }
-      getProjects();
-    }
+    const token = localStorage.getItem('githubToken');
+    if (token) setGithubToken(token);
   }, []);
 
-  const convertToMonaco = (files: File[]) => {
-    var fileData: any = []
-    files.forEach(file => {
-      fileData[file.filename] = file.contents;
-    });
-    return fileData;
-  }
+  useEffect(() => {
+    const loadProject = async () => {
+      if (!projectId) return;
 
-  // load wasm compiler
+      try {
+        const project = await getProject(projectId);
+        setProjectData(project);
+        setFiles(project.files);
+        setActiveFile(project.files[0]?.filename || 'Main.java');
+      } catch (error) {
+        console.error('Error loading project:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProject();
+  }, [projectId]);
+
+  const checkToken = () => {
+    const token = localStorage.getItem('githubToken');
+    if (!token) {
+      setShowTokenModal(true);
+      return null;
+    }
+    return token;
+  };
+
+  // Replace the handlePush function with this fixed version
+const handlePush = async () => {
+  const token = checkToken();
+  if (!token) return;
+  
+  try {
+    const octokit = new Octokit({ auth: token });
+    
+    // Get repo name from project or prompt
+    let repoName = projectData?.githubRepo || prompt("Enter GitHub repository name:");
+    if (!repoName) return;
+    
+    // Remove any owner prefix if provided (e.g., "owner/repo" -> "repo")
+    if (repoName.includes('/')) {
+      repoName = repoName.split('/')[1];
+    }
+    
+    // Get username
+    const { data: user } = await octokit.users.getAuthenticated();
+    const owner = user.login;
+
+    // Check if repo exists, create only if it doesn't
+    let repoExists = false;
+    try {
+      await octokit.repos.get({ owner, repo: repoName });
+      repoExists = true;
+      setOutputLines(prev => [...prev, `Repository ${owner}/${repoName} found, updating files...`]);
+    } catch (error: any) {
+      if (error.status === 404) {
+        // Repository doesn't exist, create it
+        try {
+          await octokit.repos.createForAuthenticatedUser({ 
+            name: repoName,
+            private: false, // Set to true if you want private repos by default
+            description: `Project created with SchoolNest IDE`
+          });
+          setOutputLines(prev => [...prev, `Created new repository: ${owner}/${repoName}`]);
+          repoExists = true;
+        } catch (createError: any) {
+          if (createError.message.includes("name already exists")) {
+            setOutputLines(prev => [...prev, `Repository ${repoName} already exists but is not accessible. Check permissions or try a different name.`]);
+            return;
+          }
+          throw createError;
+        }
+      } else {
+        throw error;
+      }
+    }
+
+    if (!repoExists) {
+      setOutputLines(prev => [...prev, `Failed to access or create repository: ${repoName}`]);
+      return;
+    }
+
+    // Commit all files (excluding CustomFileInputStream.java which is system-generated)
+    let successCount = 0;
+    let errorCount = 0;
+    
+    for (const file of files) {
+      // Skip only the system-generated CustomFileInputStream.java
+      if (file.filename === 'CustomFileInputStream.java') continue;
+      
+      try {
+        // Try to get existing file to get its SHA
+        let sha;
+        try {
+          const { data: existingFile } = await octokit.repos.getContent({
+            owner,
+            repo: repoName,
+            path: file.filename,
+          });
+          
+          // Handle both single file and array responses
+          if (Array.isArray(existingFile)) {
+            sha = existingFile[0]?.sha;
+          } else if ('sha' in existingFile) {
+            sha = existingFile.sha;
+          }
+        } catch (error) {
+          // File doesn't exist, no SHA needed
+          sha = undefined;
+        }
+
+        // Create or update file
+        const params: any = {
+          owner,
+          repo: repoName,
+          path: file.filename,
+          message: sha ? `Update ${file.filename}` : `Add ${file.filename}`,
+          content: btoa(unescape(encodeURIComponent(file.contents))), // Handle UTF-8 properly
+        };
+
+        if (sha) {
+          params.sha = sha;
+        }
+
+        await octokit.repos.createOrUpdateFileContents(params);
+        successCount++;
+        setOutputLines(prev => [...prev, `✓ ${sha ? 'Updated' : 'Added'} ${file.filename}`]);
+        
+      } catch (fileError: any) {
+        errorCount++;
+        console.error(`Error updating ${file.filename}:`, fileError);
+        setOutputLines(prev => [...prev, `✗ Error with ${file.filename}: ${fileError.message}`]);
+      }
+    }
+
+    // Update project with repo info if successful
+    if (successCount > 0 && projectData) {
+      const updatedProject = {
+        ...projectData,
+        githubRepo: `${owner}/${repoName}`,
+        lastModified: new Date().toISOString()
+      };
+      await saveProject(updatedProject);
+      setProjectData(updatedProject);
+    }
+
+    // Summary message
+    if (successCount > 0) {
+      setOutputLines(prev => [...prev, `Successfully pushed ${successCount} file(s) to ${owner}/${repoName}`]);
+      if (errorCount > 0) {
+        setOutputLines(prev => [...prev, `${errorCount} file(s) had errors`]);
+      }
+    } else {
+      setOutputLines(prev => [...prev, `Failed to push files to ${owner}/${repoName}`]);
+    }
+    
+  } catch (error: any) {
+    console.error('Push error:', error);
+    setOutputLines(prev => [...prev, `Push error: ${error.message || 'Unknown error occurred'}`]);
+    
+    // Provide specific guidance for common errors
+    if (error.message.includes('Bad credentials')) {
+      setOutputLines(prev => [...prev, 'Please check your GitHub token and ensure it has the correct permissions']);
+    } else if (error.message.includes('Not Found')) {
+      setOutputLines(prev => [...prev, 'Repository not found. Please check the repository name and your access permissions']);
+    }
+  }
+};
+
+
+const handlePull = async () => {
+  const token = checkToken();
+  if (!token) return;
+  
+  // Allow pull even if no repo is set in project data
+  let repoName = projectData?.githubRepo;
+  if (!repoName) {
+    repoName = prompt("Enter GitHub repository name (owner/repo):");
+    if (!repoName) return;
+  }
+  
+  try {
+    const octokit = new Octokit({ auth: token });
+    
+    // Parse owner/repo from input
+    let owner, repo;
+    if (repoName.includes('/')) {
+      [owner, repo] = repoName.split('/');
+    } else {
+      const { data: user } = await octokit.users.getAuthenticated();
+      owner = user.login;
+      repo = repoName;
+    }
+
+    const { data: contents } = await octokit.repos.getContent({
+      owner,
+      repo,
+      path: '',
+    });
+
+    if (Array.isArray(contents)) {
+      const newFiles = await Promise.all(
+        contents.map(async (file: any) => {
+          // Pull all files, not just .java files
+          if (file.type === 'file') {
+            const { data: fileContent } = await octokit.repos.getContent({
+              owner,
+              repo,
+              path: file.path,
+            });
+            
+            // Handle both API response formats
+            //@ts-ignore
+            const content = fileContent.content ? 
+            //@ts-ignore
+              atob(fileContent.content.replace(/\s/g, '')) : 
+              await (await fetch(file.download_url)).text();
+            
+            return {
+              filename: file.name,
+              contents: content
+            };
+          }
+          return null;
+        }).filter(Boolean)
+      );
+
+      // Find main class for CustomFileInputStream generation
+      const mainJavaFile = newFiles.find(f => 
+        f.filename.endsWith('.java') && 
+        (f.filename.includes('Main') || f.contents.includes('public static void main'))
+      );
+      const mainClassName = mainJavaFile ? 
+        mainJavaFile.filename.replace('.java', '') : 
+        'Main';
+
+      // Keep the CustomFileInputStream.java file (regenerate it for the new main class)
+      const updatedFiles = [
+        ...newFiles,
+        {
+          filename: 'CustomFileInputStream.java',
+          contents: generateCustomFileInputStream(mainClassName)
+        }
+      ];
+
+      setFiles(updatedFiles);
+      setActiveFile(newFiles[0]?.filename || 'Main.java');
+      
+      // Update project data with repo info
+      if (projectData) {
+        const updatedProject = {
+          ...projectData,
+          githubRepo: `${owner}/${repo}`,
+          lastModified: new Date().toISOString()
+        };
+        await saveProject(updatedProject);
+        setProjectData(updatedProject);
+      }
+      
+      setOutputLines(prev => [...prev, `Successfully pulled ${newFiles.length} file(s) from ${owner}/${repo}`]);
+    }
+  } catch (error: any) {
+    setOutputLines(prev => [...prev, `Pull error: ${error.message}`]);
+  }
+};
+
+const handleClone = async () => {
+  const token = localStorage.getItem('githubToken');
+  if (!cloneUrl) return;
+  
+  try {
+    // Extract owner/repo from URL
+    const match = cloneUrl.match(/github.com[/:](.+?)\/(.+?)(?:\.git)?$/);
+    if (!match) throw new Error('Invalid GitHub URL');
+    
+    const [_, owner, repo] = match;
+    
+    const octokit = token ? new Octokit({ auth: token }) : new Octokit();
+    
+    const { data: contents } = await octokit.repos.getContent({
+      owner,
+      repo,
+      path: '',
+    });
+
+    if (Array.isArray(contents)) {
+      const newFiles = await Promise.all(
+        contents.map(async (file: any) => {
+          // Clone all files, not just .java files
+          if (file.type === 'file') {
+            const { data: fileContent } = await octokit.repos.getContent({
+              owner,
+              repo,
+              path: file.path,
+            });
+            //@ts-ignore
+            const content = fileContent.content ? 
+            //@ts-ignore
+              atob(fileContent.content.replace(/\s/g, '')) : 
+              await (await fetch(file.download_url)).text();
+            
+            return {
+              filename: file.name,
+              contents: content
+            };
+          }
+          return null;
+        }).filter(Boolean)
+      );
+
+      // Find main class for CustomFileInputStream generation
+      const mainJavaFile = newFiles.find(f => 
+        f.filename.endsWith('.java') && 
+        (f.filename.includes('Main') || f.contents.includes('public static void main'))
+      );
+      const mainClassName = mainJavaFile ? 
+        mainJavaFile.filename.replace('.java', '') : 
+        'Main';
+
+      const updatedFiles = [
+        ...newFiles,
+        {
+          filename: 'CustomFileInputStream.java',
+          contents: generateCustomFileInputStream(mainClassName)
+        }
+      ];
+
+      setFiles(updatedFiles);
+      setActiveFile(newFiles[0]?.filename || 'Main.java');
+      
+      // Update project data with cloned repo info
+      if (projectData) {
+        const updatedProject = {
+          ...projectData,
+          githubRepo: `${owner}/${repo}`,
+          lastModified: new Date().toISOString()
+        };
+        await saveProject(updatedProject);
+        setProjectData(updatedProject);
+      }
+      
+      setShowCloneModal(false);
+      setCloneUrl("");
+      setOutputLines(prev => [...prev, `Successfully cloned ${newFiles.length} file(s) from ${owner}/${repo}`]);
+    }
+  } catch (error: any) {
+    setOutputLines(prev => [...prev, `Clone error: ${error.message}`]);
+  }
+};
+
+  const saveProjectToDB = async () => {
+    if (!projectData) return;
+
+    const updatedProject: Project = {
+      ...projectData,
+      files: files.filter(f => f.filename !== 'CustomFileInputStream.java'),
+      lastModified: new Date().toISOString()
+    };
+
+    try {
+      await saveProject(updatedProject);
+      setProjectData(updatedProject);
+      setOutputLines(prev => [...prev, 'Project saved successfully!']);
+    } catch (error) {
+      console.error('Error saving project:', error);
+      setOutputLines(prev => [...prev, 'Error saving project!']);
+    }
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      const contents = e.target?.result as string;
+      const newFile = {
+        filename: file.name,
+        contents,
+      };
+
+      setFiles((prev) => [...prev, newFile]);
+      setActiveFile(file.name);
+    };
+
+    reader.readAsText(file);
+  };
+
   useEffect(() => {
     const loadCheerpJ = async () => {
       try {
-        // const response = await fetch('https://cjrtnc.leaningtech.com/LATEST.txt');
-        // let cheerpJUrl = await response.text();
-        // cheerpJUrl = cheerpJUrl.trim();
-
         const cheerpJUrl = 'https://cjrtnc.leaningtech.com/3.0/cj3loader.js';
-        // const cheerpJUrl = 'http://localhost:3000/studenthome/java/ide/cj3loader.js';
 
         if (!document.querySelector(`script[src="${cheerpJUrl}"]`)) {
           const script = document.createElement('script');
@@ -274,7 +623,6 @@ public class CustomFileInputStream extends InputStream {
                     clearInput();
                   },
                 },
-                // preloadProgress: showPreloadProgress
               });
               setCheerpjLoaded(true);
             }
@@ -303,10 +651,12 @@ public class CustomFileInputStream extends InputStream {
     };
 
     loadCheerpJ();
-    setActiveFile('Main.java');
+    if (files.length > 0) {
+      setActiveFile(files[0].filename);
+    }
   }, []);
 
-  const getInput = () => {
+  const getInput = () => {//@ts-ignore
     return new Promise<string>((resolve) => {
       const checkKeyPress = (e: KeyboardEvent) => {
         if (e.key === 'Enter') {
@@ -340,15 +690,104 @@ public class CustomFileInputStream extends InputStream {
     }
   };
 
+  const generateCustomFileInputStream = (targetClassName: string) => {
+    return `/*
+CustomFileInputStream.java
+
+System.in is NOT natively supported for this WASM based Java compiler. To support user input through System.in, we pause the Java runtime, pipe user input to a file in the file system, and have System.in read from the file. This file configures System.in and runs the main method of ${targetClassName}.java. You may configure this file to handle System.in differently. When "Run ${targetClassName}.java" is clicked, it runs the main method of this file (which then runs the main method of ${targetClassName}.java).
+
+*/
+
+import java.io.*;
+import java.lang.reflect.*;
+
+public class CustomFileInputStream extends InputStream {
+    public CustomFileInputStream() throws IOException { 
+        super();
+    }
+
+    @Override
+    public int available() throws IOException {
+        return 0;
+    }
+
+    @Override 
+    public int read() {
+        return 0;
+    }
+
+    @Override
+    public int read(byte[] b, int o, int l) throws IOException {
+        while (true) {
+            // block until the textbox has content
+            String cInpStr = getCurrentInputString();
+            if (cInpStr.length() != 0) {
+                // read the textbox as bytes//@ts-ignore
+                byte[] data = cInpStr.getBytes();
+                int len = Math.min(l - o, data.length);
+                System.arraycopy(data, 0, b, o, len);
+                // clears input string
+                clearCurrentInputString();
+                return len;
+            }
+            // wait before checking again
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                throw new IOException("Interrupted", e);
+            }
+        }
+    }
+
+    @Override
+    public int read(byte[] b) throws IOException {
+        return read(b, 0, b.length);
+    }
+
+    // implemented in JavaScript
+    public static native String getCurrentInputString();
+    public static native void clearCurrentInputString();
+
+    // main method to invoke user's main method
+    public static void main(String[] args) {
+        try {
+            // set the custom InputStream as the standard input
+            System.setIn(new CustomFileInputStream());
+
+            // invoke main method in the user's selected class
+            ${targetClassName}.main(new String[0]);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}`;
+  };
+
+  const getClassNameFromFile = (filename: string) => {
+    return filename.replace('.java', '');
+  };
+
   const runCode = async () => {
     if (!cheerpjLoaded) {
       setOutputLines(['Java virtual machine is still loading! Please wait...']);
       return;
     }
-    setOutputLines(['Compiling...']);
+
+    const activeClassName = getClassNameFromFile(activeFile);
+
+    setOutputLines([`Compiling ${activeFile}...`]);
 
     const encoder = new TextEncoder();
-    files.forEach(({ filename, contents }) => {
+
+    const dynamicCustomFileInputStream = generateCustomFileInputStream(activeClassName);
+
+    const filesToCompile = [
+      ...files.filter(f => f.filename !== 'CustomFileInputStream.java'),
+      { filename: 'CustomFileInputStream.java', contents: dynamicCustomFileInputStream }
+    ];
+
+    filesToCompile.forEach(({ filename, contents }) => {
       const encodedContent = encoder.encode(contents);
       window.cheerpjAddStringFile('/str/' + filename, encodedContent);
     });
@@ -363,7 +802,7 @@ public class CustomFileInputStream extends InputStream {
     };
 
     try {
-      const sourceFiles = files.map(file => '/str/' + file.filename);
+      const sourceFiles = filesToCompile.map(file => '/str/' + file.filename);
       const classPath = '/app/tools.jar:/files/';
       const code = await window.cheerpjRunMain(
         'com.sun.tools.javac.Main',
@@ -379,20 +818,14 @@ public class CustomFileInputStream extends InputStream {
         return;
       }
 
-      setOutputLines((prev) => [...prev, 'Running...']);
-
-      // run CustomFileInputStream.main with the user's main class as an argument
+      setOutputLines((prev) => [...prev, `Running ${activeFile}...`]);
 
       await window.cheerpjRunMain(
         'CustomFileInputStream',
         classPath,
-        'Main'
+        activeClassName
       );
 
-      // await window.cheerpjRunMain(
-      //   'Main',
-      //   classPath
-      // );
     } catch (error: any) {
       console.error('Runtime error:', error);
       setOutputLines((prev) => [...prev, 'Runtime error: ' + (error?.toString() || '')]);
@@ -414,16 +847,27 @@ public class CustomFileInputStream extends InputStream {
   };
 
   const addFile = () => {
-    let newFileName = 'Class.java';
-    let counter = 1;
-    while (files.some(f => f.filename === newFileName)) {
-      newFileName = `Class${counter}.java`;
-      counter++;
-    }
-    setFiles([...files, {
-      filename: newFileName,
-      contents: `public class ${newFileName.replace('.java', '')} {\n\n}`
-    }]);
+    let baseName = 'Class';
+    let extension = '.java';
+
+    let maxSuffix = 0;
+    files.forEach(f => {
+      const match = f.filename.match(/^Class(\d*)\.java$/);
+      if (match) {
+        const suffix = match[1] ? parseInt(match[1], 10) : 0;
+        if (suffix >= maxSuffix) {
+          maxSuffix = suffix + 1;
+        }
+      }
+    });
+    const newFileName = `${baseName}${maxSuffix === 0 ? '' : maxSuffix}${extension}`;
+    setFiles([
+      ...files,
+      {
+        filename: newFileName,
+        contents: `public class ${newFileName.replace('.java', '')} {\n\n}`,
+      },
+    ]);
     setActiveFile(newFileName);
   };
 
@@ -452,6 +896,26 @@ public class CustomFileInputStream extends InputStream {
     }
   };
 
+  const handleExport = () => {
+    const file = files.find(f => f.filename === activeFile);
+    if (!file) {
+      alert("No file selected.");
+      return;
+    }
+
+    const blob = new Blob([file.contents], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    URL.revokeObjectURL(url);
+  };
+
   const handleEditorDidMount = (editor: any) => {
     monacoEditorRef.current = editor;
   };
@@ -460,7 +924,6 @@ public class CustomFileInputStream extends InputStream {
     isResizing.current = true;
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-    // Disable text selection
     document.body.style.userSelect = 'none';
   };
 
@@ -469,7 +932,6 @@ public class CustomFileInputStream extends InputStream {
     const newWidth = e.clientX - 60;
     setSidebarWidth(newWidth);
     e.preventDefault();
-    // Call layout on the Monaco Editor instance
     if (monacoEditorRef.current) {
       monacoEditorRef.current.layout();
     }
@@ -479,7 +941,6 @@ public class CustomFileInputStream extends InputStream {
     isResizing.current = false;
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup', handleMouseUp);
-    // Re-enable text selection
     document.body.style.userSelect = 'auto';
   };
 
@@ -487,26 +948,27 @@ public class CustomFileInputStream extends InputStream {
     return (
       <Link
         href="/"
-        className="font-normal flex space-x-2 items-center text-sm text-black py-1 relative z-20"
+        className="font-normal flex space-x-2 items-center text-sm text-white py-1 relative z-20"
       >
-        <div className="h-5 w-6 bg-black dark:bg-white rounded-br-lg rounded-tr-sm rounded-tl-lg rounded-bl-sm flex-shrink-0" />
+        <div className="h-6 w-6 bg-[#6A4028] rounded-lg shadow-lg shadow-[#6A4028]/30 flex-shrink-0" />
         <motion.span
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="font-medium text-black dark:text-white whitespace-pre"
+          className="font-semibold text-white whitespace-pre bg-gradient-to-r from-[#6A4028] to-white bg-clip-text text-transparent"
         >
           SchoolNest
         </motion.span>
       </Link>
     );
   };
+
   const LogoIcon = () => {
     return (
       <Link
         href="#"
-        className="font-normal flex space-x-2 items-center text-sm text-black py-1 relative z-20"
+        className="font-normal flex space-x-2 items-center text-sm text-white py-1 relative z-20"
       >
-        <div className="h-5 w-6 bg-black dark:bg-white rounded-br-lg rounded-tr-sm rounded-tl-lg rounded-bl-sm flex-shrink-0" />
+        <div className="h-6 w-6 bg-[#6A4028] rounded-lg shadow-lg shadow-[#6A4028]/30 flex-shrink-0" />
       </Link>
     );
   };
@@ -516,195 +978,320 @@ public class CustomFileInputStream extends InputStream {
       label: "Home",
       href: "/studenthome/",
       icon: (
-        <IconBrandTabler className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
+        <IconBrandTabler className="text-slate-400 h-5 w-5 flex-shrink-0" />
       ),
     },
     {
       label: "Profile",
       href: "#",
       icon: (
-        <IconUserBolt className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
+        <IconUserBolt className="text-slate-400 h-5 w-5 flex-shrink-0" />
+      ),
+    },
+    {
+      label: "Dashboard",
+      href: "/studenthome/java",
+      icon: (
+        <IconCoffee className="text-slate-400 h-5 w-5 flex-shrink-0" />
+      ),
+    },
+    {
+      label: "Dependencies",
+      href: "/studenthome/java/dependencies",
+      icon: (
+        <IconPackage className="text-slate-400 h-5 w-5 flex-shrink-0" />
+      ),
+    },
+    {
+      label: "Templates",
+      href: "/studenthome/java/templates",
+      icon: (
+        <IconTemplate className="text-slate-400 h-5 w-5 flex-shrink-0" />
       ),
     },
     {
       label: "Account Settings",
       href: "#",
       icon: (
-        <IconSettings className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
-      ),
-    },
-    {
-      label: "Build Configuration",
-      href: "#",
-      icon: (
-        <IconCoffee className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
+        <IconSettings className="text-slate-400 h-5 w-5 flex-shrink-0" />
       ),
     },
     {
       label: "Logout",
-      href: "#",
+      href: "",
       icon: (
-        <IconArrowLeft className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
+        <IconArrowLeft className="text-slate-400 h-5 w-5 flex-shrink-0" />
       ),
     },
   ];
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-neutral-950 flex items-center justify-center">
+        <div className="text-center">
+          <IconCoffee className="h-12 w-12 mx-auto text-[#6A4028] animate-pulse" />
+          <p className="mt-2 text-gray-400">Loading project...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
-        "rounded-md flex flex-col md:flex-row bg-gray-100 dark:bg-neutral-800 w-full flex-1 border border-neutral-200 dark:border-neutral-700 overflow-hidden",
-        "h-screen" // for your use case, use `h-screen` instead of `h-[60vh]`
+        "rounded-md flex flex-col md:flex-row bg-black w-full flex-1 border border-slate-800 overflow-auto",
+        "h-screen"
       )}
     >
-      <Sidebar open={open} setOpen={setOpen}>
-        <SidebarBody className="justify-between gap-10">
-          <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden ml-1">
-            {/* <div className={`flex flex-col flex-1 overflow-y-auto overflow-x-hidden ${open ? "" : "items-center"}`}> */}
-
-            {open ? <Logo /> : <LogoIcon />}
-
-            <div className="mt-8 flex flex-col gap-2">
-              {links.map((link, idx) => (
-                <SidebarLink key={idx} link={link} />
-              ))}
-            </div>
-          </div>
-          <div>
-            {signedIn ?
-              <SidebarLink
-                link={{
-                  label: name,
-                  href: "#",
-                  icon: (
-                    <Image
-                      src="/sc_logo.png"
-                      className="h-7 w-7 flex-shrink-0 rounded-full"
-                      width={50}
-                      height={50}
-                      alt="Avatar"
-                    />
-                  ),
-                }} />
-              :
-              null
-            }
-
-          </div>
-        </SidebarBody>
-      </Sidebar>
-
-      <div className="border-r border-gray-300 p-2.5 bg-[#1E1E1E]" style={{ width: sidebarWidth }}>
-        <p
-          className='ml-2 font-mono '
-          style={{
-            fontFamily: 'monospace',
-          }}
-        >{project}</p>
-        <ul>
-          <li className="flex flex-row space-x-2 w-full mt-2">
-            <button
-              className={`content-center cursor-pointer py-1 px-2 ${activeFile === "Main.java" ? 'font-bold bg-gray-700 rounded-md' : 'font-normal'}`}
-              onClick={() => setActiveFile('Main.java')}
-            >
-              Main.java
-            </button>
-          </li>
-          {/* user's files */}
-          {files
-            .filter((file) => file.filename !== 'Main.java' && file.filename !== 'CustomFileInputStream.java')
-            .map((file) => (
-              <li key={file.filename} className="flex flex-row w-full mt-2">
-                {/* <span>{fileName}</span> */}
-                <button
-                  className={`content-center cursor-pointer line-clamp-1 mr-2 px-2 ${activeFile === file.filename ? 'font-bold bg-gray-700 rounded-md' : 'font-normal'}`}
-                  onClick={() => setActiveFile(file.filename)}
-                >
-                  {file.filename}
-                </button>
-                <div className="ml-auto space-x-2 flex w-max">
-                  <button
-                    onClick={() => {
-                      const newFileName = prompt('Enter new file name', file.filename);
-                      if (newFileName && newFileName !== file.filename) {
-                        renameFile(file.filename, newFileName);
-                      }
-                    }}
-                    className="bg-stone-400 rounded-md p-1"
-                  >
-                    <svg className="dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-                      <path fill-rule="evenodd" d="M14 4.182A4.136 4.136 0 0 1 16.9 3c1.087 0 2.13.425 2.899 1.182A4.01 4.01 0 0 1 21 7.037c0 1.068-.43 2.092-1.194 2.849L18.5 11.214l-5.8-5.71 1.287-1.31.012-.012Zm-2.717 2.763L6.186 12.13l2.175 2.141 5.063-5.218-2.141-2.108Zm-6.25 6.886-1.98 5.849a.992.992 0 0 0 .245 1.026 1.03 1.03 0 0 0 1.043.242L10.282 19l-5.25-5.168Zm6.954 4.01 5.096-5.186-2.218-2.183-5.063 5.218 2.185 2.15Z" clip-rule="evenodd" />
-                    </svg>
-                  </button>
-                  <button onClick={() => removeFile(file.filename)} className="bg-red-400 rounded-md p-1">
-                    <svg className="dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-                      <path fill-rule="evenodd" d="M8.586 2.586A2 2 0 0 1 10 2h4a2 2 0 0 1 2 2v2h3a1 1 0 1 1 0 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a1 1 0 0 1 0-2h3V4a2 2 0 0 1 .586-1.414ZM10 6h4V4h-4v2Zm1 4a1 1 0 1 0-2 0v8a1 1 0 1 0 2 0v-8Zm4 0a1 1 0 1 0-2 0v8a1 1 0 1 0 2 0v-8Z" clip-rule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-              </li>
-            ))}
-          {/* system files */}
-          <li className="mt-4">
-            <div className="relative">
-              <button
-                className="flex items-center w-full text-left text-white bg-gray-400 hover:bg-gray-600 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm justify-center py-2 dark:bg-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-800"
-                onClick={() => setShowSystemFiles(!showSystemFiles)}
-                type="button"
+      {/* GitHub Token Modal */}
+      {showTokenModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-neutral-800 rounded-lg p-6 max-w-md w-full">
+            <h3 className="font-bold text-lg mb-4">GitHub Access Token</h3>
+            <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+              Create a personal access token with <code>repo</code> scope from GitHub Settings
+            </p>
+            <input
+              type="password"
+              placeholder="Enter GitHub Personal Access Token"
+              className="w-full p-2 border rounded mb-4 dark:bg-neutral-700 dark:border-neutral-600"
+              onChange={(e) => localStorage.setItem('githubToken', e.target.value)}
+            />
+            <div className="flex justify-end gap-2">
+              <button 
+                className="px-4 py-2 border rounded dark:border-neutral-600"
+                onClick={() => setShowTokenModal(false)}
               >
-                System Files
-                <svg
-                  className="w-2.5 h-2.5 ml-2"
-                  aria-hidden="true"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 10 6"
-                >
-                  <path
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M1 1l4 4 4-4"
-                  />
-                </svg>
+                Cancel
               </button>
-              {showSystemFiles && (
-                <div className="absolute z-10 bg-white divide-y divide-gray-100 rounded-lg shadow w-full mt-2 dark:bg-gray-700">
-                  <ul className="py-2 text-sm text-gray-700 dark:text-gray-200">
-                    <li>
-                      <button
-                        className={`text-xs line-clamp-1 block w-full text-center py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white ${activeFile === 'CustomFileInputStream.java' ? 'font-bold' : 'font-normal'
-                          }`}
-                        onClick={() => setActiveFile('CustomFileInputStream.java')}
-                      >
-                        CustomFileInputStream.java
-                      </button>
-                    </li>
-                    {/* add more files here */}
-                  </ul>
-                </div>
-              )}
+              <button 
+                className="px-4 py-2 bg-[#6A4028] text-white rounded"
+                onClick={() => {
+                  setGithubToken(localStorage.getItem('githubToken'));
+                  setShowTokenModal(false);
+                }}
+              >
+                Save Token
+              </button>
             </div>
-          </li>
-        </ul>
-        <div className="flex flex-col space-y-2 pt-16">
-          <button className="rounded-md py-1 bg-stone-400 font-medium" onClick={addFile}>
-            Add File
-          </button>
-          <button className="rounded-md py-1 bg-red-400 font-medium" onClick={runCode} disabled={!cheerpjLoaded}>
-            Run Main.java
-          </button>
-          <button className="rounded-md py-1 bg-blue-400 font-medium" onClick={saveProject} disabled={!cheerpjLoaded}>
-            Save Project
-          </button>
-          {!cheerpjLoaded && <div>Loading Java Compiler...</div>}
+          </div>
+        </div>
+      )}
+
+      {/* Clone Repository Modal */}
+      {showCloneModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-neutral-800 rounded-lg p-6 max-w-md w-full">
+            <h3 className="font-bold text-lg mb-4">Clone Repository</h3>
+            <input
+              type="text"
+              placeholder="https://github.com/user/repo.git"
+              className="w-full p-2 border rounded mb-4 dark:bg-neutral-700 dark:border-neutral-600"
+              value={cloneUrl}
+              onChange={(e) => setCloneUrl(e.target.value)}
+            />
+            <div className="flex justify-end gap-2">
+              <button 
+                className="px-4 py-2 border rounded dark:border-neutral-600"
+                onClick={() => setShowCloneModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="px-4 py-2 bg-[#6A4028] text-white rounded"
+                onClick={handleClone}
+              >
+                Clone
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div
+        className="border-r border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 backdrop-blur-xl flex flex-col"
+        style={{ width: sidebarWidth }}
+      >
+        <div className="p-6 -mt-2 h-full flex flex-col overflow-hidden">
+          <div className="mb-4 flex-shrink-0 font-bold flex items-center gap-2">
+            Java IDE
+            {projectData && (
+              <span className="text-sm font-normal text-neutral-500 ml-2 truncate">
+                {projectData.name}
+              </span>
+            )}
+          </div>
+
+          <div
+            className="flex-1 overflow-y-auto space-y-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-[#9C6F52] dark:scrollbar-thumb-[#6A4028] hover:scrollbar-thumb-[#D4B08D] dark:hover:scrollbar-thumb-[#9C6F52] scrollbar-thumb-rounded-full pb-4"
+            style={{ marginTop: '-12px' }}
+          >
+            <div className="relative group">
+              <button
+                className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center space-x-3 border ${activeFile === "Main.java"
+                    ? "bg-[#F5E8D9] dark:bg-[#3d2a1b] text-[#6A4028] dark:text-[#e2b48c] border-[#d4b08d] dark:border-[#6A4028] shadow-sm"
+                    : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 border-transparent hover:border-neutral-200 dark:hover:border-neutral-700"
+                  }`}
+                onClick={() => setActiveFile("Main.java")}
+              >
+                <div className="w-8 h-8 bg-[#6A4028] rounded-lg flex items-center justify-center shadow-sm">
+                  <IconCode className="h-4 w-4 text-white" />
+                </div>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <span className="font-mono text-sm font-medium truncate">Main.java</span>
+                  {activeFile === "Main.java"}
+                </div>
+              </button>
+            </div>
+
+            {files
+              .filter(
+                (file) =>
+                  file.filename !== "Main.java" &&
+                  file.filename !== "CustomFileInputStream.java"
+              )
+              .map((file) => (
+                <div key={file.filename} className="relative group">
+                  <div className="flex items-center space-x-2">
+                    <button
+                      className={`flex-1 text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center space-x-3 border ${activeFile === file.filename
+                          ? "bg-[#F5E8D9] dark:bg-[#3d2a1b] text-[#6A4028] dark:text-[#e2b48c] border-[#d4b08d] dark:border-[#6A4028] shadow-sm"
+                          : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 border-transparent hover:border-neutral-200 dark:hover:border-neutral-700"
+                        }`}
+                      onClick={() => setActiveFile(file.filename)}
+                    >
+                      <div className="w-8 h-8 bg-[#6A4028] rounded-lg flex items-center justify-center shadow-sm">
+                        <Code className="h-4 w-4 text-white" />
+                      </div>
+                      <span className="font-mono text-sm font-medium truncate flex-1">
+                        {file.filename}
+                      </span>
+                    </button>
+
+                    <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <button
+                        onClick={() => {
+                          const newFileName = prompt("Enter new file name", file.filename);
+                          if (newFileName && newFileName !== file.filename) {
+                            renameFile(file.filename, newFileName);
+                          }
+                        }}
+                        className="p-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-[#F5E8D9] dark:hover:bg-[#3d2a1b] rounded-lg transition-all duration-200 border border-neutral-200 dark:border-neutral-700 hover:border-[#d4b08d] dark:hover:border-[#6A4028]"
+                        title="Rename file"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400 hover:text-[#6A4028] dark:hover:text-[#D4B08D]" />
+                      </button>
+                      <button
+                        onClick={() => removeFile(file.filename)}
+                        className="p-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-all duration-200 border border-neutral-200 dark:border-neutral-700 hover:border-red-300 dark:hover:border-red-600"
+                        title="Delete file"
+                      >
+                        <IconTrash className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400 hover:text-red-600 dark:hover:text-red-400" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+
+          <div className="space-y-4 flex-shrink-0">
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                className="rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
+                onClick={addFile}
+                disabled={!cheerpjLoaded}
+              >
+                <IconFileDownload className="w-4 h-4" />
+                <span className="text-sm">Add File</span>
+              </button>
+
+              <button
+                className="rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
+                onClick={runCode}
+                disabled={!cheerpjLoaded}
+              >
+                <IconPlayerPlayFilled className="w-4 h-4" />
+                <span className="text-sm">Run File</span>
+              </button>
+
+              <button
+                className="rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
+                onClick={handleExport}
+                disabled={!cheerpjLoaded}
+              >
+                <IconFolderDown className="w-4 h-4" />
+                <span className="text-sm">Export</span>
+              </button>
+
+              <label className="rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium cursor-pointer transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 flex items-center justify-center space-x-2 active:scale-[0.98]">
+                <IconUpload className="w-4 h-4" />
+                <span className="text-sm">Load</span>
+                <input
+                  type="file"
+                  accept=".java"
+                  onChange={handleFileUpload}
+                  disabled={!cheerpjLoaded}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {/* GitHub Integration Buttons */}
+            <div className="mt-4 flex flex-col gap-3">
+              <button
+                className="rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
+                onClick={handlePush}
+                disabled={!cheerpjLoaded}
+              >
+                <IconBrandGithub className="w-4 h-4" />
+                <span className="text-sm">Push to GitHub</span>
+              </button>
+              
+              <button
+                className="rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
+                onClick={handlePull}
+                disabled={!cheerpjLoaded || !projectData?.githubRepo}
+              >
+                <IconBrandGithub className="w-4 h-4" />
+                <span className="text-sm">Pull from GitHub</span>
+              </button>
+              
+              <button
+                className="rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
+                onClick={() => setShowCloneModal(true)}
+                disabled={!cheerpjLoaded}
+              >
+                <IconBrandGithub className="w-4 h-4" />
+                <span className="text-sm">Clone Repository</span>
+              </button>
+            </div>
+
+            {/* Save button */}
+            <button
+              className="w-full rounded-lg py-3 px-4 bg-[#F5E8D9] dark:bg-[#3d2a1b] hover:bg-[#e8d5c0] dark:hover:bg-[#4d3a2b] text-[#6A4028] dark:text-[#e2b48c] font-medium cursor-pointer transition-all duration-200 border border-[#d4b08d] dark:border-[#6A4028] hover:border-[#c5a37f] dark:hover:border-[#7d5a40] disabled:opacity-50 flex items-center justify-center space-x-2 active:scale-[0.98]"
+              onClick={saveProjectToDB}
+              disabled={!cheerpjLoaded}
+            >
+              <IconDeviceFloppy className="w-4 h-4" />
+              <span className="text-sm">Save Project</span>
+            </button>
+
+            {!cheerpjLoaded && (
+              <div className="mt-4 p-4 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <IconLoader className="h-4 w-4 text-[#6A4028] animate-spin" />
+                  <span className="text-neutral-600 dark:text-neutral-400 text-sm font-medium">Loading Java Compiler...</span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
       <div
-        className="w-1 h-full bg-gray-500 cursor-col-resize"
+        className="w-1 h-full bg-neutral-300 dark:bg-neutral-600 cursor-col-resize hover:bg-[#6A4028] dark:hover:bg-[#6A4028] transition-all duration-200"
         onMouseDown={handleMouseDown}
       />
-      {/* monaco editor */}
       <div className="flex-1 flex flex-col min-w-0">
         <div className='bg-[#1E1E1E]'>
           <p
@@ -728,7 +1315,14 @@ public class CustomFileInputStream extends InputStream {
             onMount={handleEditorDidMount}
           />
         </div>
-        {/* Output */}
+        <div
+          style={{
+            height: '5px',
+            cursor: 'row-resize',
+            backgroundColor: '#ccc',
+          }}
+        />
+
         <div
           style={{
             height: '200px',
@@ -743,8 +1337,8 @@ public class CustomFileInputStream extends InputStream {
         >
           {outputLines.map((line, index) => (
             <div key={index}>{line}</div>
+
           ))}
-          {/* Input Field */}
           <div style={{ display: 'flex' }}>
             &gt;&nbsp;
             <input
