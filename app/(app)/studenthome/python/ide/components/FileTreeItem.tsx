@@ -8,7 +8,7 @@ export interface File {
   contents: string;
   isFolder?: boolean;
   parentFolder?: string;
-  path?: string;
+  path: string;
 }
 
 interface FileTreeItemProps {

@@ -22,8 +22,9 @@ interface FileExplorerProps {
   handleDragLeave: () => void;
   handleDrop: (e: React.DragEvent, folderName?: string) => void;
   getChildren: (folderName: string, allFiles: File[]) => File[];
-  setShowGitModal: React.Dispatch<React.SetStateAction<boolean>>;
   dragOverFolder?: string | null; // Add this prop to track drag state
+  setShowGitModal: (show: boolean) => void;
+  setDragOverFolder: (folder: string | null) => void;
 }
 
 export const FileExplorer: React.FC<FileExplorerProps> = ({
@@ -44,8 +45,9 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
   handleDragLeave,
   handleDrop,
   getChildren,
-  setShowGitModal,
   dragOverFolder,
+  setShowGitModal,
+  setDragOverFolder,
 }) => {
   return (
     <div className="p-6 -mt-2 h-full flex flex-col overflow-hidden">
@@ -127,14 +129,6 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
           </button>
 
           <button
-            onClick={() => setShowGitModal(true)}
-            className="rounded-lg py-3 px-4 bg-[#304529] hover:bg-[#4a6741] text-white font-medium transition-all duration-200 border border-slate-700 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
-          >
-            <IconBrandGithub className="w-4 h-4" />
-            <span className="text-sm">Git</span>
-          </button>
-
-          <button
             onClick={handleExport}
             className="rounded-lg py-3 px-4 bg-[#304529] hover:bg-[#4a6741] text-white font-medium transition-all duration-200 border border-slate-700 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
           >
@@ -152,6 +146,17 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
               className="hidden"
             />
           </label>
+
+           <button
+            className="rounded-lg py-3 px-4 bg-[#304529] hover:bg-[#4a6741] text-white font-medium transition-all duration-200 border border-slate-700 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
+            onClick={() => {
+              setShowGitModal(true)
+              console.log('GitHub button clicked');
+            }}
+          >
+            <IconBrandGithub className="w-4 h-4" />
+            <span className="text-sm">GitHub</span>
+          </button>
         </div>
       </div>
     </div>
