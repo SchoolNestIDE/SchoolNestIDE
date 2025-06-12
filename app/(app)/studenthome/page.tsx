@@ -162,11 +162,6 @@ export default function Page() {
         await localForage.setItem("projectList", newStorage);
         setProjectList(newProjectList);
 
-        // if (data.error) {
-        //     console.log('Error creating project:', data.error);
-        // } else {
-        //     setProjectList([...projectList, data.project_name]);
-        // }
     }
 
 
@@ -184,33 +179,25 @@ export default function Page() {
             href: "/studenthome/java",
         },
         {
-            title: "Node.js",
-            icon: (
-                <IconFileTypeJs className="h-full w-full text-neutral-500 dark:text-neutral-300" />
-            ),
-            href: "/studenthome/linux",
-        },
-
-        {
             title: "Python",
             icon: (
                 <IconBrandPython className="h-full w-full text-neutral-500 dark:text-neutral-300" />
             ),
-            href: "/studenthome/linux",
+            href: "/studenthome/python",
         },
         {
             title: "C++",
             icon: (
                 <IconBrandCpp className="h-full w-full text-neutral-500 dark:text-neutral-300" />
             ),
-            href: "/studenthome/linux?prog=gcc",
+            href: "/studenthome/cpp",
         },
         {
             title: "Linux Terminal",
             icon: (
                 <IconTerminal2 className="h-full w-full text-neutral-500 dark:text-neutral-300" />
             ),
-            href: "/studenthome/linux",
+            href: "/studenthome/editor",
         },
     ];
 
@@ -424,6 +411,7 @@ export default function Page() {
         )
     }
 
+<<<<<<< HEAD
     const items = [
         {
             title: "Your projects",
@@ -438,6 +426,8 @@ export default function Page() {
         },
 
     ];
+=======
+>>>>>>> wasm
 
 
     return (
@@ -449,6 +439,7 @@ export default function Page() {
                         <FloatingNav />
                         
 
+<<<<<<< HEAD
                         <BentoGrid className="">
                             {items.map((item, i) => (
                                 <BentoGridItem
@@ -465,6 +456,31 @@ export default function Page() {
                     </ModalDialogProvider>
                 </IndexedDBProvider>
             </Nossr>
+=======
+                    </div>
+                </BackgroundLines>
+
+                {/* <BackgroundBeams /> */}
+                {/* <Boxes /> */}
+            </div>
+
+            {/* <BackgroundLines className="flex items-center justify-center w-full flex-col px-4">
+                <h2 className="bg-clip-text text-transparent text-center bg-gradient-to-b from-neutral-900 to-neutral-700 dark:from-neutral-600 dark:to-white text-2xl md:text-4xl lg:text-7xl font-sans py-2 md:py-10 relative z-20 font-bold tracking-tight">
+                    Sanjana Airlines, <br /> Sajana Textiles.
+                </h2>
+                <p className="max-w-xl mx-auto text-sm md:text-lg text-neutral-700 dark:text-neutral-400 text-center">
+                    Get the best advices from our experts, including expert artists,
+                    painters, marathon enthusiasts and RDX, totally free.
+                </p>
+            </BackgroundLines> */}
+
+            <div className="absolute top-3/4 flex items-center justify-center w-full">
+                <FloatingDock
+                    mobileClassName="translate-y-40"
+                    items={links}
+                />
+            </div>
+>>>>>>> wasm
 
         </>
 

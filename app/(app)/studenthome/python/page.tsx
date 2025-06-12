@@ -1,0 +1,679 @@
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import {
+  IconPlus,
+  IconFolder,
+  IconTemplate,
+  IconSchool,
+  IconTrash,
+  IconEdit,
+  IconExternalLink,
+  IconBrandPython,
+  IconCode,
+  IconFile,
+  IconHome,
+  IconDeviceLaptop,
+  IconBrandGithub,
+  IconChalkboard
+} from '@tabler/icons-react';
+import { BackgroundLines } from "@/app/components/ui/background-lines";
+const DB_NAME = 'PythonProjectsDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'projects';
+//@ts-ignore
+const openDB = () => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+
+    request.onupgradeneeded = (event) => {
+      //@ts-ignore
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        store.createIndex('name', 'name', { unique: false });
+        store.createIndex('lastModified', 'lastModified', { unique: false });
+      }
+    };
+  });
+};
+
+
+const saveProject = async (project) => {
+  const db = await openDB();
+  // @ts-ignore
+  const transaction = db.transaction([STORE_NAME], 'readwrite');
+  const store = transaction.objectStore(STORE_NAME);
+  return store.put(project);
+};
+
+const getProjects = async () => {
+  const db = await openDB();
+  // @ts-ignore
+  const transaction = db.transaction([STORE_NAME], 'readonly');
+  const store = transaction.objectStore(STORE_NAME);
+  return new Promise((resolve, reject) => {
+    const request = store.getAll();
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+const deleteProject = async (id) => {
+  const db = await openDB();
+  // @ts-ignore
+  const transaction = db.transaction([STORE_NAME], 'readwrite');
+  const store = transaction.objectStore(STORE_NAME);
+  return store.delete(id);
+};
+
+const templateProjects = [
+  {
+    id: 'template-hello-world',
+    name: 'Hello World',
+    description: 'Basic Python application with print statement',
+    template: true,
+    files: [
+      {
+        filename: 'main.py',
+        contents: `def main():
+    print("Hello, World!")
+
+if __name__ == "__main__":
+    main()`
+      }
+    ]
+  },
+  {
+    id: 'template-calculator',
+    name: 'Simple Calculator',
+    description: 'Basic calculator with arithmetic operations',
+    template: true,
+    files: [
+      {
+        filename: 'calculator.py',
+        contents: `def calculator():
+    try:
+        num1 = float(input("Enter first number: "))
+        operator = input("Enter operator (+, -, *, /): ")
+        num2 = float(input("Enter second number: "))
+        
+        if operator == '+':
+            result = num1 + num2
+        elif operator == '-':
+            result = num1 - num2
+        elif operator == '*':
+            result = num1 * num2
+        elif operator == '/':
+            if num2 != 0:
+                result = num1 / num2
+            else:
+                print("Error: Division by zero!")
+                return
+        else:
+            print("Invalid operator!")
+            return
+        
+        print(f"Result: {result}")
+        
+    except ValueError:
+        print("Error: Please enter valid numbers!")
+
+if __name__ == "__main__":
+    calculator()`
+      }
+    ]
+  },
+  {
+    id: 'template-oop-basics',
+    name: 'OOP Basics',
+    description: 'Object-oriented programming example with classes',
+    template: true,
+    files: [
+      {
+        filename: 'student.py',
+        contents: `class Student:
+    def __init__(self, name, age, student_id):
+        self.name = name
+        self.age = age
+        self.student_id = student_id
+    
+    def get_name(self):
+        return self.name
+    
+    def set_name(self, name):
+        self.name = name
+    
+    def get_age(self):
+        return self.age
+    
+    def set_age(self, age):
+        self.age = age
+    
+    def get_student_id(self):
+        return self.student_id
+    
+    def display_info(self):
+        print(f"Name: {self.name}")
+        print(f"Age: {self.age}")
+        print(f"Student ID: {self.student_id}")`
+      },
+      {
+        filename: 'main.py',
+        contents: `from student import Student
+
+def main():
+    student1 = Student("John Doe", 20, "ST001")
+    student2 = Student("Jane Smith", 19, "ST002")
+    
+    print("Student 1 Information:")
+    student1.display_info()
+    
+    print("\\nStudent 2 Information:")
+    student2.display_info()
+
+if __name__ == "__main__":
+    main()`
+      }
+    ]
+  }
+];
+
+const mockClasses = [
+  { id: 1, name: "Algorithms Data AB", code: "CSA25", instructor: "Mr. Mark Estep" }
+];
+
+export default function ProjectManager() {
+  const [projects, setProjects] = useState([]);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  const loadProjects = async () => {
+    try {
+      const savedProjects = await getProjects();
+      // @ts-ignore
+      setProjects(savedProjects.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified)));
+    } catch (error) {
+      console.error('Error loading projects:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const createProject = async (template = null) => {
+    const trimmedName = newProjectName.trim();
+
+    if (!trimmedName) {
+      setError('Project name cannot be empty');
+      return;
+    }
+
+    if (trimmedName.length > 50) {
+      setError('Project name must be 50 characters or less');
+      return;
+    }
+
+    const nameExists = projects.some(
+      project => project.name.toLowerCase() === trimmedName.toLowerCase()
+    );
+
+    if (nameExists) {
+      setError('A project with this name already exists');
+      return;
+    }
+
+    const newProject = {
+      id: `project-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: trimmedName,
+      created: new Date().toISOString(),
+      lastModified: new Date().toISOString(),
+      files: template ? template.files : [
+        {
+          filename: 'main.py',
+          contents: `def main():
+    print("Hello, World!")
+
+if __name__ == "__main__":
+    main()`
+        }
+      ],
+      installedPackages: []
+    };
+
+    try {
+      await saveProject(newProject);
+      setProjects(prev => [newProject, ...prev]);
+      setNewProjectName('');
+      setSelectedTemplate(null);
+      setError('');
+      setShowCreateModal(false);
+    } catch (error) {
+      console.error('Error creating project:', error);
+      setError('Failed to create project. Please try again.');
+    }
+  };
+
+  const createFromTemplate = (template) => {
+    setSelectedTemplate(template);
+    setNewProjectName(template.name);
+    setShowCreateModal(true);
+    setError('');
+  };
+
+  const removeProject = async (projectId) => {
+
+    const confirmed = window.confirm('Are you sure you want to delete this project? This action cannot be undone.');
+
+    if (confirmed) {
+      try {
+        console.log('Attempting to delete project:', projectId);
+        await deleteProject(projectId);
+
+
+        setProjects(prev => {
+          const updatedProjects = prev.filter(p => p.id !== projectId);
+          console.log('Projects after deletion:', updatedProjects.length);
+          return updatedProjects;
+        });
+
+        console.log('Project deleted successfully');
+      } catch (error) {
+        console.error('Error deleting project:', error);
+
+        alert('Failed to delete project. Please try again.');
+      }
+    }
+  };
+
+  const openIDE = (project) => {
+    window.open(`/studenthome/python/ide?projectId=${project.id}`, '_blank');
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+  const dockLinks = [
+    {
+      title: "Back Home",
+      icon: <IconHome className="h-full w-full text-[#4F7942]" />,
+      href: "/studenthome",
+    },
+    {
+      title: "Python Dashboard",
+      icon: <IconBrandPython className="h-full w-full text-[#4F7942]" />,
+      href: "/studenthome/python",
+    },
+    {
+      title: "Python IDE",
+      icon: <IconCode className="h-full w-full text-[#4F7942]" />,
+      href: "/studenthome/python/ide",
+    },
+  ];
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-neutral-950 flex items-center justify-center">
+        <div className="text-center">
+          <IconBrandPython className="h-12 w-12 mx-auto text-[#306844] animate-pulse" />
+          <p className="mt-2 text-gray-400">Loading your projects...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* Remove this line to get rid of the floating nav bar: */}
+      {/* <FloatingNav className="z-50" /> */}
+
+      <div className="pt-32 px-4 min-h-screen bg-neutral-950 text-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="relative mb-12">
+            <BackgroundLines className="opacity-10 absolute inset-0">
+              <div className="absolute inset-0" />
+            </BackgroundLines>
+
+            <div className="text-center relative z-10">
+              <h1 className="text-4xl md:text-6xl lg:text-7xl bg-clip-text text-transparent bg-gradient-to-b from-[#90EE90] via-[#228B22] to-[#006400] font-bold mb-4">
+                Project Manager
+              </h1>
+              <p className="text-neutral-400 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-8">
+                Create, manage, and organize your Python projects
+              </p>
+
+              <div className="flex justify-center mb-12">
+                <div className="flex space-x-4 p-4 bg-neutral-900/80 backdrop-blur-xl rounded-2xl border border-neutral-700/40 shadow-2xl">
+                  {dockLinks.map((link, index) => (
+                    <div key={index} className="relative group">
+                      <a
+                        href={link.href}
+                        className="flex items-center justify-center w-14 h-14 bg-neutral-800/70 backdrop-blur-sm hover:bg-neutral-700/90 rounded-xl transition-all duration-300 hover:scale-110 hover:rotate-2 border border-neutral-600/50 shadow-lg hover:shadow-xl hover:shadow-[#228B22]/25"
+                      >
+                        {React.cloneElement(link.icon, {
+                          className: "h-6 w-6 text-[#4F7942] group-hover:text-[#90EE90] transition-colors duration-200"
+                        })}
+                      </a>
+
+                      <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-neutral-900/95 backdrop-blur-md text-white px-3 py-1 rounded-lg text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all duration-300 pointer-events-none border border-neutral-600/50 shadow-xl">
+                        {link.title}
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-neutral-900/95"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Your Projects */}
+            <div className="lg:col-span-2">
+              <div className="bg-neutral-800/60 rounded-lg shadow-sm border border-neutral-700 backdrop-blur-sm">
+                <div className="p-6 border-b border-neutral-700">
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-2">
+                      <IconFolder className="h-6 w-6 text-[#4F7942]" />
+                      <h2 className="text-xl font-semibold text-white">Your Projects</h2>
+                      <span className="bg-neutral-700 text-neutral-200 px-2 py-1 rounded-full text-sm">
+                        {projects.length}/10
+                      </span>
+                    </div>
+                    {projects.length > 0 && (
+                      <button
+                        onClick={() => setShowCreateModal(true)}
+                        className="flex items-center gap-1 bg-[#306844] hover:bg-[#1a3a24] text-white px-3 py-1.5 rounded-lg text-sm transition-all duration-300 hover:scale-105 group"
+                      >
+                        <IconPlus className="h-4 w-4 group-hover:rotate-90 transition-transform duration-300" />
+                        New Project
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  {projects.length === 0 ? (
+                    <div className="text-center py-12">
+                      <IconCode className="h-16 w-16 mx-auto text-neutral-400 mb-4" />
+                      <h3 className="text-lg font-medium text-white mb-2">No projects yet</h3>
+                      <p className="text-neutral-400 mb-4">Create your first Python project to get started</p>
+                      <button
+                        onClick={() => setShowCreateModal(true)}
+                        className="bg-[#4F7942] hover:bg-[#1a3a24] text-white px-4 py-2 rounded-lg transition-colors duration-300 hover:scale-105"
+                      >
+                        Create Project
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {projects.slice(0, 10).map((project) => (
+                        <div
+                          key={project.id}
+                          className="flex items-center justify-between p-4 border border-neutral-700 rounded-lg hover:bg-neutral-700/60 transition-all duration-300 group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-[#306844]/20 rounded-lg group-hover:bg-[#306844]/30 transition-colors">
+                              <IconBrandPython className="h-5 w-5 text-[#4F7942]" />
+                            </div>
+                            <div>
+                              <h3 className="font-medium text-white">{project.name}</h3>
+                              <p className="text-sm text-neutral-400">
+                                Modified {formatDate(project.lastModified)}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => openIDE(project)}
+                              className="flex items-center gap-1 bg-[#306844] hover:bg-[#1a3a24] text-white px-3 py-1.5 rounded text-sm transition-all duration-300 hover:scale-105"
+                            >
+                              <IconExternalLink className="h-4 w-4" />
+                              Open IDE
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeProject(project.id);
+                              }}
+                              className="p-1.5 text-red-400 hover:bg-red-400/10 rounded transition-colors duration-300 hover:scale-105">
+                              <IconTrash className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Template Projects */}
+              <div className="bg-neutral-800/60 rounded-lg shadow-sm border border-neutral-700 backdrop-blur-sm">
+                <div className="p-4 border-b border-neutral-700">
+                  <div className="flex items-center gap-2">
+                    <IconTemplate className="h-5 w-5 text-[#4F7942]" />
+                    <h3 className="font-semibold text-white">Templates</h3>
+                  </div>
+                </div>
+
+                <div className="p-4 space-y-3">
+                  {templateProjects.map((template) => (
+                    <div
+                      key={template.id}
+                      className="border border-neutral-700 rounded-lg p-3 hover:bg-neutral-700/60 transition-all duration-300 cursor-pointer group"
+                      onClick={() => createFromTemplate(template)}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-white text-sm">{template.name}</h4>
+                          <p className="text-xs text-neutral-400 mt-1">{template.description}</p>
+                        </div>
+                        <IconPlus className="h-4 w-4 text-neutral-400 flex-shrink-0 mt-0.5 group-hover:text-[#4F7942] transition-colors" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Your Classes */}
+              <div className="bg-neutral-800/60 rounded-lg shadow-sm border border-neutral-700 backdrop-blur-sm">
+                <div className="p-4 border-b border-neutral-700">
+                  <div className="flex items-center gap-2">
+                    <IconSchool className="h-5 w-5 text-[#4F7942]" />
+                    <h3 className="font-semibold text-white">Your Classes</h3>
+                  </div>
+                </div>
+
+                <div className="p-4 space-y-3">
+                  {mockClasses.map((classItem) => (
+                    <div key={classItem.id} className="border border-neutral-700 rounded-lg p-3 hover:bg-neutral-700/60 transition-colors">
+                      <h4 className="font-medium text-white text-sm">{classItem.code}</h4>
+                      <p className="text-xs text-neutral-300 mt-1">{classItem.name}</p>
+                      <p className="text-xs text-neutral-400">{classItem.instructor}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Create Project Modal */}
+          {showCreateModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-neutral-800 rounded-lg max-w-md w-full p-6 border border-neutral-700 backdrop-blur-sm">
+                <h3 className="text-lg font-semibold text-white mb-4">
+                  {selectedTemplate ? `Create from ${selectedTemplate.name}` : 'Create New Project'}
+                </h3>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-neutral-200 mb-2">
+                    Project Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newProjectName}
+                    onChange={(e) => {
+                      setNewProjectName(e.target.value);
+                      setError('');
+                    }}
+                    placeholder="Enter project name (max 50 characters)"
+                    className="w-full px-3 py-2 bg-neutral-700/50 text-white border border-neutral-600 rounded-lg focus:ring-2 focus:ring-[#228B22] focus:border-transparent transition-colors"
+                    autoFocus
+                    maxLength={50}
+                  />
+                  {error && (
+                    <p className="text-red-400 text-sm mt-2">{error}</p>
+                  )}
+                  <div className="text-right text-xs text-neutral-400 mt-1">
+                    {newProjectName.length}/50 characters
+                  </div>
+                </div>
+
+                {selectedTemplate && (
+                  <div className="mb-4 p-3 bg-[#228B22]/20 border border-[#228B22]/30 rounded-lg">
+                    <p className="text-sm text-[#90EE90]">
+                      <strong>Template:</strong> {selectedTemplate.description}
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex gap-3 justify-end">
+                  <button
+                    onClick={() => {
+                      setShowCreateModal(false);
+                      setNewProjectName('');
+                      setSelectedTemplate(null);
+                      setError('');
+                    }}
+                    className="px-4 py-2 text-neutral-400 hover:text-neutral-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => createProject(selectedTemplate)}
+                    disabled={!newProjectName.trim()}
+                    className="px-4 py-2 bg-[#306844] hover:bg-[#1a3a24] disabled:bg-neutral-600 text-white rounded-lg transition-all duration-300 hover:scale-105"
+                  >
+                    Create Project
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <style jsx global>{`
+        /* Disable scrolling */
+        html, body {
+          overflow: auto !important;
+          height: auto !important;
+        }
+
+        .bento-grid-item {
+          overflow: hidden !important;
+          border-radius: 1rem !important;
+          contain: layout style paint;
+        }
+
+        .bento-grid-item > div {
+          height: 100% !important;
+          overflow: hidden !important;
+          box-sizing: border-box;
+        }
+
+        .bento-scroll-container {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(34, 139, 34, 0.3) transparent;
+          scroll-behavior: smooth;
+        }
+
+        .bento-scroll-container::-webkit-scrollbar {
+          width: 4px;
+        }
+
+        .bento-scroll-container::-webkit-scrollbar-track {
+          background: transparent;
+          border-radius: 2px;
+        }
+
+        .bento-scroll-container::-webkit-scrollbar-thumb {
+          background: rgba(34, 139, 34, 0.3);
+          border-radius: 2px;
+          transition: background-color 0.2s ease;
+        }
+
+        .bento-scroll-container::-webkit-scrollbar-thumb:hover {
+          background: rgba(34, 139, 34, 0.5);
+        }
+
+        .bento-scroll-container {
+          overscroll-behavior: contain;
+        }
+
+        html {
+          scroll-behavior: smooth;
+        }
+
+        ::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+          background: rgba(0, 0, 0, 0.1);
+          border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+          background: rgba(34, 139, 34, 0.5);
+          border-radius: 3px;
+          transition: background-color 0.2s ease;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+          background: rgba(34, 139, 34, 0.7);
+        }
+
+        .truncate {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .scrollbar-thin {
+          scrollbar-width: thin;
+        }
+
+        .scrollbar-track-transparent {
+          scrollbar-color: transparent transparent;
+        }
+
+        .scrollbar-thumb-[#228B22] {
+          scrollbar-color: rgba(34, 139, 34, 0.3) transparent;
+        }
+
+        .scrollbar-thumb-rounded-full {
+        }
+      `}</style>
+    </>
+  );
+}
