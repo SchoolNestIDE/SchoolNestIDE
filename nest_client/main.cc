@@ -16,7 +16,6 @@
 #include <sys/inotify.h>
 #include <errno.h>
 #include <string>
-#include <nest_client/nest_client.pb.h>
 #include <algorithm>
 #include <sys/epoll.h>
 #include <sys/mman.h>
@@ -133,28 +132,6 @@ int findFirstInactiveConnection() {
   return -1;
 }
 
-void handle_protocol(Protocol& pr, ProtocolResponse* response) {
-  
-  if (pr.type() == Type::READDIR) {
-    ReaddirRequest r = pr.readdirrequest();
-    response->Clear();
-    int d = r.dirid();
-    if (d >= dirStreams.size()) {
-      Error* err = response->mutable_error();
-      err->set_error("Dir stream out of bounds\n");
-      return;
-    }
-    if (!dirStreams.at(d).dent) {
-      Error* err = response->mutable_error();
-      err->set_error("Dir stream expired\n");
-      return;
-    }
-    DirectoryStream& stream =  dirStreams.at(d);
-    DIR* dir = stream.dent;
-    dev_t dm = 0;
-    sizeof(dm);
-  }
-}
 int inotify_poll_loop() {
 
 }

@@ -13,10 +13,9 @@ disk-only:
 prepare:
 	mkdir -p gen
 	mkdir -p out
-	protoc $(SRCS_PROTO) --cpp_out=gen --js_out=import_style=commonjs,binary:gen 
 
 compile: prepare
-	i686-linux-gnu-g++ -static $(INCLUDE_DIRS) $(SRCS_C) $(SRCS_PROTO_C) -lprotobuf  -o out/nest-client
+	echo "not using protobuf"
 docker:
 	docker build -t nest_client .
 	docker run --privileged --rm -v $(shell pwd):/app nest_client make -C /app -f Makefile compile
