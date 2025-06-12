@@ -1,34 +1,15 @@
 "use client";
-import React, { createContext, ReactNode, Ref, useContext, useEffect, useRef, useState, } from 'react';
+import React from 'react';
 import "xterm/css/xterm.css"
-import Image from 'next/image';
 import dynamic from 'next/dynamic';
-import * as ps from 'path';
-import { urlToHttpOptions } from 'url';
-import * as octokit from '@octokit/rest'
-import { IconBrandAdobeAfterEffect } from '@tabler/icons-react';
 import { GitPanel } from './git';
-import { Button, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger
- } from '@nextui-org/react';
-import { useMemoryContext } from './filesystem';
-import { FilePanel, filePanelState, FileSystemRoot } from './filepanel';
-import Breadcrumb, { WriteState } from './breadcrumb';
-import {DownloadProgressBar} from './progressbar';
-import { ADDRGETNETWORKPARAMS } from 'dns';
-import { DB } from './indexeddb';
+import { FileSystemRoot } from './filepanel';
 import Prompt from './prompt';
-import { number } from 'motion/react';
 import { Providers } from './providers';
-import { editor } from 'monaco-editor';
-import { useEmulatorCtx } from './emulator';
-import { MessageLoop } from './ipc';
 import { Editor } from './editorContext';
-import { tmpdir } from 'os';
 import Nossr from './nossr';
 import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from '@/components/ui/resizable'
-import { FitAddon } from '@xterm/addon-fit';
-import { useModalDialogCtx } from './ModalDialog';
-import { Files, FilesIcon, GitBranchIcon, HelpCircleIcon } from 'lucide-react';
+import { FilesIcon, GitBranchIcon, HelpCircleIcon } from 'lucide-react';
 import { ActionBar, ActionBarItem } from './actionBar';
 import JavaBeginnerGuide from './HelpPanel';
 const mimeType = require('mime-types');

@@ -45,6 +45,7 @@ interface FileSystemTree {
 }
 
 let evtTarget = new EventTarget();
+let selectedPath = null;
 function FileSystemNode({ path, padding, visibility, root, directory }: {
   path: string
   padding: number,
@@ -131,10 +132,12 @@ function FileSystemNode({ path, padding, visibility, root, directory }: {
         }
         else {
           setSelected(true);
+          // this is selected.
+
         }
         return true;
       };
-      evtTarget.addEventListener('selectionChange', cb);
+      evtTarget.addEventListener('selectionChanged', cb);
       destructurData.cbToRemove = cb;
       fm.Watch(id, ref.bind(null, fm, id))
 
@@ -157,7 +160,9 @@ function FileSystemNode({ path, padding, visibility, root, directory }: {
   }, [])
   async function oClick(evt: React.MouseEvent) {
     evtTarget.dispatchEvent(new CustomEvent('selectionChanged', {
-      detail: inodeNum
+      detail: inodeNum,
+      bubbles: false,
+      cancelable: false
     }));
     let fp = (await memContext.emulator).emulator.fs9p;
     let ino = fp.inodes[fp.SearchPath(path).id];
