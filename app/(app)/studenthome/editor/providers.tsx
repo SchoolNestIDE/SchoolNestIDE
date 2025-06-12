@@ -4,6 +4,7 @@ import { FileSystemProvider } from "./filesystem";
 import { EditorContextProvider } from "./editorContext";
 import { EmulatorProvider } from "./emulator";
 import { GitProvider } from "./git";
+import { ModalDialogProvider } from "./ModalDialog";
 //
 // fs depends on editor context
 // emulator depends on fs
@@ -12,6 +13,7 @@ import { GitProvider } from "./git";
 export function Providers({ children }: { children: React.ReactNode }) {
 
     return (
+        <ModalDialogProvider>
         <IndexedDBProvider>
             <EditorContextProvider>
                 <FileSystemProvider>
@@ -23,5 +25,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
                 </FileSystemProvider>
             </EditorContextProvider>
         </IndexedDBProvider>
+        </ModalDialogProvider>
     )
 }

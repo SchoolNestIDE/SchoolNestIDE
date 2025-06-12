@@ -4,9 +4,17 @@ import dynamic from 'next/dynamic';
 import * as React from 'react';
 import { useMemoryContext } from './filesystem';
 import ThemeSwitcher from '@/app/components/ThemeSwitcher';
-import { FilePanel } from './filepanel';
+import { FilePanel, FileSystemRoot } from './filepanel';
 import localforage from 'localforage';
 import { StorageType } from '../storage_config';
+import { ResizablePanelGroup,ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
+import { ActionBar, ActionBarItem } from './actionBar';
+import { FilesIcon, GitBranchIcon, HelpCircleIcon } from 'lucide-react';
+import { GitPanel } from './git';
+import JavaBeginnerGuide from './HelpPanel';
+import { MessageLoop } from './ipc';
+import { useEmulatorCtx } from './emulator';
+import { FitAddon } from '@xterm/addon-fit';
 const mimeType = require('mime-types');
 const ps = require('path');
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
@@ -20,8 +28,9 @@ interface EditorContextType {
   get fs(): typeof import('fs') | null;
   set fs(fs: typeof import('fs'));
   editor?: editor.IStandaloneCodeEditor,
-  getRepoName(projectName: string): Promise<string>
-  getUserName(projectName: string): Promise<string>
+  getRepoName(projectName: string): Promise<string|null>
+  getUserName(projectName: string): Promise<string|null>
+  getBranchName(projectName: string): Promise<string|null>
 }
 interface EditorTab {
   path: string,
@@ -31,6 +40,99 @@ interface EditorTabProp {
   edt: EditorTab,
   onOpen?: (editorTab: EditorTab) => void,
   onClose?: (editorTab: EditorTab) => void
+}
+function XTermComponent({evtTarget}:{evtTarget: EventTarget}) {
+  
+  const terminalRef = React.useRef(null);
+
+
+  const [downloadProgress, setDownloadProgressUI] = React.useState(0);
+  const [fitAddon, setFitAddon] = React.useState<FitAddon|null>(null);
+  let emuCtx = useEmulatorCtx();
+  let memoryContextSettings = useMemoryContext();
+  // debugger;
+  
+  React.useEffect(() => {
+    let temr;
+    console.log(terminalRef.current);
+
+    setTimeout((async () => {
+      
+      if (!terminalRef.current) {
+        // This should not happen
+        console.error("UseEffect triggered with unloaded terminal");
+        return;
+      }
+        
+      
+      let em = await emuCtx.emulator;
+      var fs;
+      console.log(em);
+      const xterm = await import('@xterm/xterm');
+      let fitAddon = await import("@xterm/addon-fit");
+      console.log(terminalRef);
+
+      /* eslint-disable */
+      let fadd = new fitAddon.FitAddon();
+      if (!memoryContextSettings) {
+        return;
+      }
+
+      console.log(fadd);
+      fs = memoryContextSettings.fs;
+
+
+
+      temr = new xterm.Terminal({ });
+
+      temr.options.fontSize = 14;
+      temr.options.lineHeight = 1;
+      console.log(terminalRef)
+      temr.open(terminalRef.current);
+      temr.loadAddon(fadd);
+      setFitAddon(fadd);
+      evtTarget.addEventListener('resize', ()=>{
+        fadd.fit();
+      })
+      let msgLoop = new MessageLoop();
+      em.msgLoop = msgLoop;
+      msgLoop.onEmulatorEnabled(em.emulator, temr);
+      MessageLoop.virtio_console_bus((await emuCtx.emulator).emulator);
+
+      await emuCtx.waitTillDiskIsSaved();
+      fadd.fit()
+    }));
+  }, []);
+  // debugger;
+
+
+
+
+  let placeholder = (
+    <div className={`relative flex flex-grow flex-row items-center justify-items-center`}>
+
+
+    </div>
+  )
+  function switchToEditor() {
+
+  }
+
+  const mouseState = { down: false, cb: null };
+
+function a(am: any) {
+  if (!fitAddon) {
+    return;
+  }
+  console.log(am);
+  fitAddon.fit();
+
+}
+
+  return (
+      <div style={{height: "auto"}} ref={terminalRef}></div>
+
+  );
 }
 const EditorContextTypeContext = React.createContext<EditorContextType | undefined>(undefined);
 const TabsView: React.FC<EditorTabProp> = function (props) {
@@ -60,7 +162,9 @@ const TabsView: React.FC<EditorTabProp> = function (props) {
       </div></div>
   )
 }
+let evtTarget = new EventTarget();
 function Editor() {
+  console.log(localforage);
   let ec = React.useContext(EditorContextTypeContext);
   let [tabs, setTabs] = React.useState([] as EditorTab[]);
   let r = React.useRef(tabs);
@@ -85,20 +189,32 @@ function Editor() {
       <h1>Ensure this is wrapped in a EditorContextProvider</h1>
     );
   }
+  let MonacoEditor = dynamic(()=>import('@monaco-editor/react'),{ssr: false});
+  function dispatchResize() {
+    evtTarget.dispatchEvent(new Event('resize'));
+  }
+  
+  
   return (
-    <div style={{ display: "flex", flexDirection: "row", height: "60%" }}>
-      <FilePanel></FilePanel>
-      <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%" }}>
-        <div style={{ display: "flex", flexDirection: "row" }}>
-          {tabs.map((v) => {
-            return <TabsView edt={v} key="s" onOpen={onTabOpen} onClose={onTabClose} />
-          })}
-        </div>
+    <>
+    
+    <ResizablePanel>
+      <ResizablePanelGroup direction="vertical">
+           
+          <ResizablePanel >
+        <MonacoEditor  beforeMount={(mon)=>{
+          ec.monaco = mon
+          }}  onChange={ec.onChange.bind(ec)} onMount={(editor)=>{
+            if (ec.monaco){ec.monaco.editor.setTheme('vs-dark')};ec.editor = editor}} ></MonacoEditor>
 
-        <MonacoEditor beforeMount={(mon) => { ec.monaco = mon; setTimeout(() => { mon.editor.setTheme('vs-dark') }) }} onMount={(ed) => { ec.editor = ed; ed.getModel()?.setValue("Code will be included here once a file is loaded...") }} onChange={ec.onChange.bind(ec)}></MonacoEditor>
-
-      </div>
-    </div>
+          </ResizablePanel>   
+          <ResizableHandle style={{width: "20px"}} withHandle ></ResizableHandle>
+            <ResizablePanel onResize={dispatchResize}>
+              <XTermComponent evtTarget={evtTarget}/>
+            </ResizablePanel>
+      </ResizablePanelGroup>
+    </ResizablePanel>
+    </>
   )
 }
 function EditorContextProvider({ children }: { children: React.ReactNode }) {
@@ -122,17 +238,24 @@ function EditorContextProvider({ children }: { children: React.ReactNode }) {
   }
   const editorContext: EditorContextType = {
     monaco: undefined,
+    async getBranchName(projectName) {
+      let m = (await getProject(projectName));
+      if (!m) {
+        return "main";
+      }
+      return m.githubBranch;
+    },
     async getRepoName(projectName: string){
       let m = (await getProject(projectName));
       if (!m) {
-        return "D";
+        return null;
       }
       return m.githubRepo;
     },
       async getUserName(projectName: string) {
         let m = (await getProject(projectName));
         if (!m) {
-          return "D";
+          return null;
         }
         return m.githubUsername;
   },

@@ -4,6 +4,9 @@ import { MemoryContextType, useMemoryContext } from './filesystem';
 import { useEditorContext } from './editorContext';
 import { useEmulatorCtx } from './emulator';
 import { GitPanel } from './git';
+import { IconArrowDown, IconArrowRight } from '@tabler/icons-react';
+import { fstat } from 'fs';
+import { FileIcon } from 'lucide-react';
 
 const S_IRWXUGO = 0x1FF;
 const S_IFMT = 0xF000;
@@ -40,48 +43,122 @@ interface Node {
 interface FileSystemTree {
   root: Node
 }
-function FileSystemNode({ path, padding, visibility, root }: {
+
+let evtTarget = new EventTarget();
+function FileSystemNode({ path, padding, visibility, root, directory }: {
   path: string
   padding: number,
   visibility: boolean,
-  root?: boolean
+  root?: boolean,
+  directory: boolean
 }) {
 
   if (!root) {
     root = false;
   }
-  const [fileList, setFileList] = useState([] as string[]);
+  const [fileList, setFileList] = useState([] as {
+    name: string,
+    directory: boolean
+  }[]);
   const [viz, setVisibility] = useState(true);
   const [selected, setSelected] = useState(true);
   const ref = useRef();
   ref.current = viz as any;
   const editorContext = useEditorContext();
   let memContext = useEmulatorCtx();
+  let [inodeNum, setInodeNum] = useState(-1);
   useEffect(() => {
+    let destructurData = { id: -1, fm: null as any, cbToRemove: null as any };
+    async function ref(fm: any, id: number) {
+      if (!fm.inodes[id]) {
+        fm.RemoveWatcher(id, ref);
+        return;
+      }
+      setTimeout(() => {
+        let fList = fm.read_dir(path);
+        let cd = path;
+        if (cd === '/') {
+          cd = '';
+        }
+        setFileList(fm.read_dir(path).map((v:any) => {
+          let cd = path;
+          if (cd === '/') {
+            cd = '';
+          }
+          return {
+            name: v,
+            directory: fm.IsDirectory(fm.SearchPath(cd+'/'+v).id)
+          }
+        }));
+        setTimeout(async () => {
+          await fm.persist()
+        })
+      });
+    }
     (async () => {
 
       console.log(memContext);
       let fm = (await memContext.emulator).emulator.fs9p;
       await fm.initialize();
-      setFileList(fm.read_dir(path));
-      let id = fm.SearchPath(path).id;
-      fm.Watch(id, async function ref() {
-        if (!fm.inodes[id]) {
-          fm.RemoveWatcher(id, ref);
-          return;
+      console.log(path);
+      let id
+      try {
+        setFileList(fm.read_dir(path).map((v:any) => {
+          let cd = path;
+          if (cd === '/') {
+            cd = '';
+          }
+          return {
+            name: v,
+            directory: fm.IsDirectory(fm.SearchPath(cd+'/'+v).id)
+          }
+        }));
+
+        id = fm.SearchPath(path).id;
+      } catch {
+        console.error('could not find path');
+        return;
+      }
+      destructurData.id = id;
+      destructurData.fm = fm;
+      setInodeNum(id);
+      console.log("adding listener")
+      let cb = (ev: Event) => {
+        console.log("listened too")
+        let cd = ev as CustomEvent<number>;
+        if (cd.detail === id) {
+          setSelected(false);
         }
-        setTimeout(()=>{
-        let fList = fm.read_dir(path);
-        setFileList(fList);
-        setTimeout(async () => {
-          await fm.persist()
-        })
-      });
-      })
+        else {
+          setSelected(true);
+        }
+        return true;
+      };
+      evtTarget.addEventListener('selectionChange', cb);
+      destructurData.cbToRemove = cb;
+      fm.Watch(id, ref.bind(null, fm, id))
 
     })();
+    return () => {
+      let { fm, id,cbToRemove } = destructurData;
+      if (fm) {
+        if (id >= 0) {
+        fm.RemoveWatcher(destructurData.id, ref);
+        }
+      }
+      if (cbToRemove) {
+        evtTarget.removeEventListener('selectionChange', cbToRemove);
+      }
+
+      
+
+      console.log("removed watcher")
+    }
   }, [])
   async function oClick(evt: React.MouseEvent) {
+    evtTarget.dispatchEvent(new CustomEvent('selectionChanged', {
+      detail: inodeNum
+    }));
     let fp = (await memContext.emulator).emulator.fs9p;
     let ino = fp.inodes[fp.SearchPath(path).id];
     if ((ino.mode & S_IFMT) === S_IFDIR) {
@@ -98,18 +175,22 @@ function FileSystemNode({ path, padding, visibility, root }: {
 
   return (
     <div>
-      <div style={{ cursor: "pointer", paddingLeft: `${padding}px`, fontSize: root?"18pt": "12pt", backgroundColor: selected ? "initial" : "white"}} onClick={oClick}>{path.split('/').slice(-1)[0]}</div>
+      <div style={{ display: "flex", alignItems: "center", cursor: "pointer", paddingLeft: `${padding}px`, fontSize: root ? "18pt" : "12pt", backgroundColor: selected ? "initial" : "rgba(255,255,255,0.4)",  flexDirection: "row" }} onClick={oClick}>{(directory) ? ((viz ) ? (
+          <IconArrowDown size="12pt"></IconArrowDown>
+        ) : (
+          <IconArrowRight size="12pt"></IconArrowRight>
+        )): (<FileIcon size="12pt"></FileIcon>)}{path.split('/').slice(-1)[0]}</div>
       <div style={{ display: viz ? "block" : "none" }}>
-        {fileList.map((name, idx) => {
+        {fileList.map(({ name, directory }, idx) => {
           return (
-            <FileSystemNode key={idx} visibility={visibility} path={(path === "/" ? "" : path) + "/" + name} padding={padding + 20}>
+            <FileSystemNode key={idx} visibility={visibility} path={(path === "/" ? "" : path) + "/" + name} padding={padding + 20} directory={directory}>
 
             </FileSystemNode>
           )
         })}
       </div>
     </div>
-    
+
   )
 }
 function nodeifyTree(memoryContext: MemoryContextType, path: string) {
@@ -117,6 +198,7 @@ function nodeifyTree(memoryContext: MemoryContextType, path: string) {
 
 }
 function FileSystemRoot() {
+  console.log('[LOADING FS ROOT]')
   let qState = useMemoryContext();
 
   let eu = useEmulatorCtx();
@@ -127,7 +209,13 @@ function FileSystemRoot() {
   ));
 
   useEffect(() => {
+    if (qState?.alreadyInitializedFS) {
+      setSt((<FileSystemNode path={"/" + qState.projectName} padding={-20} visibility={true} root={true} directory={true}></FileSystemNode>));
+      return;
+    }
     (async () => {
+      if (qState)
+        qState.alreadyInitializedFS = true;
       if (!qState) {
         return;
       }
@@ -146,7 +234,7 @@ function FileSystemRoot() {
       let a = await eu.emulator;
       let fs = a.emulator.fs9p;
       await fs.initialize();
-      
+
       let am = fs.Search(0, projectname);
       if (am >= 0) {
       } else {
@@ -157,7 +245,7 @@ function FileSystemRoot() {
 
       }, 200);
       let toWrite = (
-        <FileSystemNode path={"/" + projectname} padding={-20} visibility={true} root={true}></FileSystemNode>
+        <FileSystemNode path={"/" + projectname} padding={-20} visibility={true} root={true} directory={true}></FileSystemNode>
       );
       setSt(toWrite);
     })()
@@ -201,13 +289,11 @@ export
 
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", minWidth: "20%", fontSize: "18px", backgroundColor: "black", color: "white" }} id="cmenurelev">
-      <div style={{ position: 'relative', overflow: "auto"}}>
+    <div style={{ display: "flex", flexDirection: "column", minWidth: "20%", fontSize: "18px", color: "white" }} className={"bg-muted/30"} id="cmenurelev">
+      <div style={{ position: 'relative', overflow: "auto" }} className={"bg-muted/30"}>
         <FileSystemRoot></FileSystemRoot>
       </div>
-      <div style={{ position: "relative" }}>
-        <GitPanel></GitPanel>
-      </div>
+      
     </div>
   )
 }

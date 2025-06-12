@@ -7,6 +7,8 @@ interface Connection {
     send: (buf: Uint8Array | string) => void,
     handle: (buf: Uint8Array) => void
 }
+const waitFor = 'virtio-console0-output-bytes';
+const writeTo = 'virtio-console0-input-bytes';
 interface ExtendedWebViewerConnection extends Connection {
     id: number
 }
@@ -101,6 +103,7 @@ class MessageLoop {
         return this._instance;
         
     }
+    static virtio_console_bus: (emulator: any)=>void = ()=>{};
     static onEmulatorLoaded(emulator: any) {
     }
     onEmulatorEnabled(emulator: any, terminal: q.Terminal) {
@@ -111,13 +114,9 @@ class MessageLoop {
         terminal.onData((byte)=>{
             emulator.serial0_send(byte);
         })
+        
        emulator.add_listener("serial0-output-byte", (byte: number) => {
-        collector[cursor] = byte;
-        cursor++;
-        if (String.fromCharCode(byte) === "\n") {
-          this.onSerialLine(new TextDecoder().decode(collector.slice(0, cursor - 1)));
-          cursor = 0;
-        }
+        
         terminal.write(new Uint8Array([byte]));
       });
     }
@@ -132,12 +131,13 @@ class MessageLoop {
     
     onSerialLine(line: string) {
         if (line.indexOf("ptr") === 0) {
+            Object.defineProperty(globalThis, 'msgLoop', {value: this});
             // console.log("here");
             console.log(line.substring(3, line.indexOf(" ")));
             dmaBufferAddress = parseInt(line.substring(3, line.indexOf(" ")));
             this.rx_addr = parseInt(line.substring(line.indexOf(" ") + 1));
 
-            setInterval(this.everyTick.bind(this), 10);
+            this.emulator.add_listener(waitFor, this.everyTick.bind(this));
         }
     }
     everyTick() {
@@ -265,6 +265,14 @@ function send_connect_packet(msgLoop: MessageLoop, port: number, handler: (buffe
 
     msgLoop.emulator.write_memory(new Uint8Array((c[1] as DataView).buffer), dmaBufferAddress + 1);
     msgLoop.emulator.write_memory([1], dmaBufferAddress);
+    
     return result;
 }
-export {MessageLoop};
+MessageLoop.virtio_console_bus = function (emulator: any) {
+    emulator.add_listener(waitFor, function (msg: Uint8Array) {
+        if (new TextDecoder().decode(msg) === 'c') return;
+        console.log(new TextDecoder().decode(msg));
+        emulator.bus.send(writeTo, new TextEncoder().encode('a'));
+    })
+}
+export {MessageLoop, open_webviewer};

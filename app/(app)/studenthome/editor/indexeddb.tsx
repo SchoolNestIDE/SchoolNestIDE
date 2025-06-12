@@ -3,6 +3,10 @@ import { createContext, ReactNode, useContext, useState } from "react";
 async function ensureDB() {
   return new Promise<IDBDatabase>((resolve) => {
     let p = indexedDB.open("response-storage", 400);
+    console.log('dbwrite')
+    p.onerror = (e)=>{
+      throw new Error("IDB Error "+ p.error);
+    }
     p.onupgradeneeded = (ev) => {
       let database = p.result;
 
@@ -18,10 +22,12 @@ async function ensureDB() {
           keyPath: "path"
         });
       }
+      console.log('hi');
     }
 
     p.onsuccess = (ev) => {
       resolve(p.result);
+      console.log('hi');
 
     }
   });

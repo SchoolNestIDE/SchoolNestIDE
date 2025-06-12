@@ -39,10 +39,12 @@ export default function Prompt() {
         setInputValue("");
         promptState.setVisbility(false);
         if (promptState.handler) {
-            promptState.handler(iElem.value);
+            promptState.handler(inputValue);
         }
     }
     let handleClose = function () {
+        setInputValue("");
+
         promptState.setVisbility(false);
         promptState.handler(null);
     }
@@ -58,7 +60,7 @@ export default function Prompt() {
     promptState.setSensitivity = setSensitivity;
     
     return (
-        <div ref={PromptReference as any} style={{fontSize: "18pt", display: viz ? "flex" : "none",flexDirection:"column",position: "fixed",zIndex: "100000", width: "50%", height: "auto", left: "25%", top: "0%", backgroundColor: "black", color: "white"}}>
+        <div ref={PromptReference as any} style={{zIndex: "9999", padding: "12pt",fontSize: "18pt", display: viz ? "flex" : "none",flexDirection:"column",position: "fixed", width: "50%", height: "auto", left: "25%", top: "0%", borderRadius: "12pt", backgroundColor: "rgb(50,50,50)", color: "white", gap:"2px", marginTop:"2px", }}>
             
             {promptText[0]}
             <div style={{display: inputBoxViz?"block":"none"}}>

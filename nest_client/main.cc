@@ -18,6 +18,7 @@
 #include <string>
 #include <nest_client/nest_client.pb.h>
 #include <algorithm>
+#include <sys/epoll.h>
 #include <sys/mman.h>
 typedef struct {
     uint64_t pfn : 55;
@@ -39,13 +40,19 @@ typedef struct {
   char message[];
 } ProtocolWrapper;
 typedef struct {
-  int port;
+  uint32_t RequestSize;
+  char cmd[];
 } ConnectRequest;
 typedef struct {
   int connId;
   size_t msgLen;
   char data[];
 } DataPkt;
+typedef struct {
+  int connId;
+  size_t maxMsgLen;
+  char data[];
+} RecvPkt;
 typedef struct {
   int id;
 } Disconnect;
@@ -55,7 +62,7 @@ typedef struct {
 } ConnectResponse;
 typedef struct {
   int connectionid; 
-  int fd;
+  int stdinFd, stdoutFd, stderrFd;
   int active = 1;
 } ActiveConnection;
 typedef struct {
@@ -125,38 +132,7 @@ int findFirstInactiveConnection() {
   }
   return -1;
 }
-int handle_connection(int port, int* id, int* error) {
-  sockaddr_in ip;
-  inet_pton(AF_INET, "127.0.0.1", &ip.sin_addr);
-  ip.sin_port = htons(port);
-  memset(ip.sin_zero, 0,sizeof(ip.sin_zero));
-  ip.sin_family = AF_INET;
-  if ((*id = findFirstInactiveConnection()) >= 0) {
-    // already set
-  }else {
-  *id = activeConnection.size();
-  activeConnection.emplace_back();
 
-  }
-  // activeConnection[id] = (ActiveConnection*) malloc(sizeof(ActiveConnection));
-  // std::unique_ptr up = std::make_unique<ActiveConnection>();
-  ActiveConnection& up = activeConnection.at(*id);
-  up.connectionid = *id;
-
-  printf("up connection id:  %d\r\n", up.connectionid);
-  up.fd = socket(AF_INET, SOCK_STREAM, 0);
-  int s = up.fd;
-  up.active = true;
-  if (connect(s, (sockaddr*)&ip, sizeof(sockaddr_in)) < 0) {
-    printf("connect for a message (%d) failed\n", port);
-    *error = errno;
-    activeConnection.pop_back();
-    return -1;
-  };
-  
-  // activeConnection.push_back(std::move(up));
-
-}
 void handle_protocol(Protocol& pr, ProtocolResponse* response) {
   
   if (pr.type() == Type::READDIR) {
@@ -205,130 +181,108 @@ memset(ipc_buffer_tx, 0, 65536);
     };
     printf("ptr%lu %lu\n", physaddr, physaddr_tx);
     FILE* f = fopen("/tmp/sv.log", "wb");
+    int hvcFd = open("/dev/hvc0", O_RDWR|O_SYNC);
+    
+    int m;
+    int n =0xa;
     while (true) {
         std::vector<ActiveConnection> connToUpdate;
         
         ProtocolWrapper* rx = (ProtocolWrapper*) (ipc_buffer_rx + 1);
 
         ProtocolWrapper* tx = (ProtocolWrapper*) (ipc_buffer_tx + 1); 
-        if (*ipc_buffer_rx == 1) {
-          int error = 0;
+        read(hvcFd, &m, 1);
+        
          
-          memset(tx->message, 0, 2048);
-          tx->msgId = rx->msgId;
-          tx->msgType = RESPONSE;
-          *ipc_buffer_tx = 0;
-          if (rx->msgType == PROTOBUF) {
-            Protocol p;
-            Protobuf* pr = (Protobuf*) rx->message;
-            p.ParseFromArray(pr->message, pr->msgLength);
-            ProtocolResponse resp;
-            resp.Clear();
-            handle_protocol(p, &resp);
-            std::string data = resp.SerializeAsString();
-            Protobuf* response = (Protobuf*) tx->message;
-            response->msgLength = kChunkSize;
-            size_t l = data.size();
-            size_t off = 0;
-
-            while (l >= 0) {
-              size_t to_write = std::min(l, (size_t)kChunkSize);
-              memcpy(response->message, data.c_str() + off, data.size());
-              l -= to_write;
-              off += to_write;
-              *ipc_buffer_tx = 1;
-              while (*ipc_buffer_tx == 1);
-            }
-
-          }
           if (rx->msgType == CONNECT) {
             ConnectRequest* cr = (ConnectRequest*) rx->message;
-            ConnectResponse* cresp = new ConnectResponse();
-            cresp->id = -1;
-            cresp->error = 0;
-            int result = handle_connection(cr->port,&cresp->id, &cresp->error);
-            
-            memcpy(tx->message, cresp, sizeof(ConnectResponse));
-            delete cresp;
-          }
-          if (rx->msgType == DISCONNECT) {
-            printf("Disconnected\n");
+            uint32_t rpSize = cr->RequestSize;
+            char* rpCmd = (char*) cr->cmd;
+            rpCmd[rpSize]= '\0';
 
-            Disconnect* d = (Disconnect*) rx->message;
-            while (true){
-            if (d->id >= activeConnection.size()) {
-              // handle error later
-              break;
-            }
-            ActiveConnection& ac = activeConnection.at(d->id);
-            ac.active = false;
-            close(ac.fd);
-            break;
+
+            
+            int stdinFd = memfd_create("stdin-", 0);
+            int stdoutFd = memfd_create("stdout-", 0);
+            int stderrFd = memfd_create("stderr-", 0);
+
+            int chProc = fork();
+            
+            if (chProc == 0) {
+               const char* z[] = {"sh", "-c", cr->cmd};
+                lseek(stdinFd, 0, SEEK_SET);
+                dup2(stdinFd, 0);
+                dup2(stdoutFd, 1);
+                dup2(stderrFd, 2);
+
+               execvp("/bin/busybox", (char*const*)z);
+            }else {
+              ActiveConnection conn;
+              conn.connectionid = findFirstInactiveConnection();
+              if (conn.connectionid < 0) {
+                conn.connectionid = activeConnection.size();
+                
+              }
+              conn.stdinFd = stdinFd;
+              conn.stdoutFd = stdoutFd;
+              conn.stderrFd = stderrFd;
+              conn.active = true;
+              activeConnection.push_back(conn);
+              
             }
           }
           if (rx->msgType == DATA) {
-            DataPkt* d = (DataPkt*) rx->message;
-            uint32_t id = d->connId;
-            uintptr_t offsetInto = (uintptr_t) d - (uintptr_t) ipc_buffer_rx;
-            uintptr_t chunkSize = 1024 * 1024 * 4 - offsetInto;
-            
-            while (1) {
-            if (id >= activeConnection.size()) {
-              // handle error later
-              break;
-            }else {
-              ActiveConnection& ac = activeConnection.at(id);
-              if (!ac.active) {
-                break;
-              }else {
-                send(ac.fd, d->data, d->msgLen, 0);
-              }
-            }
-            break;
-            }
-            
+            DataPkt* pkt  = (DataPkt*)rx->message;
+            ActiveConnection ac = activeConnection.at(pkt->connId);
+            write(ac.stdinFd, pkt->data, pkt->msgLen);
+
           }
-          *ipc_buffer_rx = 0;
           
           
-          ipc_buffer_tx[0] = 1;
-          while (ipc_buffer_tx[0] == 1); // Wait for process
+          
+          
+          write(hvcFd, &n, 1);
+        read(hvcFd, &m, 1);
+
           // write buffered messages  
           
-        }
+        
 
-        for (ActiveConnection& updated : activeConnection) {
-          if (!updated.active) {
-            continue;
-          }
-          DataPkt *dp = (DataPkt*) malloc(sizeof(DataPkt) + 1500);
-          memset(dp, 0, sizeof(DataPkt) + 1500);
-          dp->connId = updated.connectionid;
-          int len;
-          while ((len = recv(updated.fd, dp->data, 1500, MSG_DONTWAIT)) >= 0) {
-            if (len == 0) {
-              updated.active = 0;
-              tx->msgType = DISCONNECT;
-              Disconnect* disconnect = (Disconnect*) tx->message;
-              disconnect->id = updated.connectionid;
-              tx->msgId = 0;
-              ipc_buffer_tx[0] = 1;
-              while (ipc_buffer_tx[0] == 1); // wait for ack 
-              break;
-            }
-            // printf("recving fr\n");
-            tx->msgType = DATA;
-            dp->msgLen = len;
-            tx->msgId = 0;
-            memcpy(tx->message, dp, sizeof(DataPkt) + 1500);
+        // for (ActiveConnection& updated : activeConnection) {
+        //   if (!updated.active) {
+        //     continue;
+        //   }
+        //   DataPkt *dp = (DataPkt*) malloc(sizeof(DataPkt) + 1500);
+        //   memset(dp, 0, sizeof(DataPkt) + 1500);
+        //   dp->connId = updated.connectionid;
+        //   int len;
+        //   while ((len = recv(updated.fd, dp->data, 1500, MSG_DONTWAIT)) >= 0) {
+        //     if (len == 0) {
+        //       updated.active = 0;
+        //       tx->msgType = DISCONNECT;
+        //       Disconnect* disconnect = (Disconnect*) tx->message;
+        //       disconnect->id = updated.connectionid;
+        //       tx->msgId = 0;
+        //       ipc_buffer_tx[0] = 1;
+        //       write(hvcFd, &n, 1);
+        //       read(hvcFd, &m, 1);
+        //       break;
+        //     }
+        //     // printf("recving fr\n");
+        //     tx->msgType = DATA;
+        //     dp->msgLen = len;
+        //     tx->msgId = 0;
+        //     memcpy(tx->message, dp, sizeof(DataPkt) + 1500);
 
-            ipc_buffer_tx[0] = 1; // let client process
-            while (ipc_buffer_tx[0] == 1); // Wait for process
+        //     m = 1; 
+        //     write(hvcFd, &n, 1);
+        //     read(hvcFd, &m, 1);
+            
 
-          }
-          free(dp);
-          // perror("test");  
-        }
+        //   }
+        //   free(dp);
+        //   // perror("test");  
+        // }
     };
     return 0;
 }

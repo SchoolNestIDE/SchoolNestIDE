@@ -57,6 +57,7 @@ interface MemoryContextType {
     actualUpdateCB: () => boolean,
     langType?: string,
     projectName?: string
+    alreadyInitializedFS: boolean
 };
 let memoryContextSettings: MemoryContextType;
 let MemoryContextContext = createContext<MemoryContextType | undefined>(undefined);
@@ -74,6 +75,7 @@ function FileSystemProvider({ children }: { children: React.ReactNode }) {
     })
 
     memoryContextSettings = {
+        alreadyInitializedFS:false,
         set fs(v) {
             resolution(v);
         },

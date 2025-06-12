@@ -6,6 +6,10 @@ import { MessageLoop } from './ipc';
 import { IndexedDBContextType, useIDB } from './indexeddb';
 import ThemeSwitcher from '@/app/components/ThemeSwitcher';
 import localForage from 'localforage';
+import { showPrompt } from './prompt';
+import RenderModalDialog from './modal_dialog';
+import { DownloadProgressBar } from './progressbar';
+import { useModalDialogCtx } from './ModalDialog';
 let baseURI = ''
 async function downloadV86() {
 
@@ -20,6 +24,7 @@ interface EmulatorContextData {
 interface CustomProgressEvent {
   loaded: number;
   total: number;
+  name?: string;
 }
 class EmulatorContextCls {
   eventQueue: {
@@ -101,6 +106,7 @@ class EmulatorContextCls {
     })
 
   }
+  fileSelectionChanged  = new EventTarget()
 
 }
 const EmulatorContext = createContext<EmulatorContextCls | null>(null);
@@ -112,12 +118,26 @@ function EmulatorProvider({ children }: { children: React.ReactNode }) {
   let memContext = FileSystem.useMemoryContext();
   
   let idb = useIDB();
+  let mdCtx = useModalDialogCtx();
 
   useEffect(() => {
     (async () => {
 
       console.log("set emulator");
       if (!memContext) return;
+      localStorage.openpages = Date.now();
+      
+      var onLocalStorageEvent = function(e: any){
+          if(e.key == "openpages"){
+              // Listen if anybody else is opening the same page!
+              localStorage.page_available = Date.now();
+          }
+          if(e.key == "page_available"){
+            
+          }
+      };
+      window.addEventListener('storage', onLocalStorageEvent, false);
+      
       let q = await downloadV86();
       let inst = localForage.createInstance({
         name: "response-storage",
@@ -126,8 +146,16 @@ function EmulatorProvider({ children }: { children: React.ReactNode }) {
       
       });
       let qs = (await inst.getItem("/diskbuffer")) as ArrayBuffer|undefined;
+      
       if (!qs) {
         let r = await fetch('/disk');
+        mdCtx.setModalContents((
+          <div style={{minWidth: "200px",textAlign: "center"}} >
+            The disk is downloading, please stand by
+          <DownloadProgressBar></DownloadProgressBar>
+          </div>
+        ))
+        mdCtx.setModalVisibility(true);
         qs = new ArrayBuffer(parseInt(r.headers.get("Content-Length") ?? "0"));
         let ua = new Uint8Array(qs);
         let b = r.body;
@@ -148,6 +176,9 @@ function EmulatorProvider({ children }: { children: React.ReactNode }) {
         }
         await inst.setItem("/diskbuffer", qs);
       }
+      
+      mdCtx.setModalContents(null);
+      mdCtx.setModalVisibility(false);
       let u = new URL(location.href);
       u.pathname = "";
       u.protocol = "http:";
@@ -186,16 +217,18 @@ function EmulatorProvider({ children }: { children: React.ReactNode }) {
         // screen_container: document.querySelector('#screen_container'),s
         filesystem: memContext.vmObject,
         cmdline: "root=/dev/sda console=ttyS0 rootfstype=squashfs  init=/init rw  tsc=reliable mitigations=off random.trust_cpu=on -- " + final ,
-        autostart: true
+        autostart: true,
+        virtio_console: true
       });
+    
       c.emulator = {
-        emulator: emu
+        emulator: emu,
+        msgLoop: null
       };
       setTimeout(async ()=>{
         await emu.fs9p.initialize();
               // await downloadLargerToVirtualDisk(c, emu.fs9p);
         c.diskSaved = true;
-        
       }, 2000);
     })();
   });

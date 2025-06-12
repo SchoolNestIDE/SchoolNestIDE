@@ -8,9 +8,10 @@ import { urlToHttpOptions } from 'url';
 import * as octokit from '@octokit/rest'
 import { IconBrandAdobeAfterEffect } from '@tabler/icons-react';
 import { GitPanel } from './git';
-import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from '@nextui-org/react';
+import { Button, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger
+ } from '@nextui-org/react';
 import { useMemoryContext } from './filesystem';
-import { FilePanel, filePanelState } from './filepanel';
+import { FilePanel, filePanelState, FileSystemRoot } from './filepanel';
 import Breadcrumb, { WriteState } from './breadcrumb';
 import {DownloadProgressBar} from './progressbar';
 import { ADDRGETNETWORKPARAMS } from 'dns';
@@ -23,6 +24,13 @@ import { useEmulatorCtx } from './emulator';
 import { MessageLoop } from './ipc';
 import { Editor } from './editorContext';
 import { tmpdir } from 'os';
+import Nossr from './nossr';
+import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from '@/components/ui/resizable'
+import { FitAddon } from '@xterm/addon-fit';
+import { useModalDialogCtx } from './ModalDialog';
+import { Files, FilesIcon, GitBranchIcon, HelpCircleIcon } from 'lucide-react';
+import { ActionBar, ActionBarItem } from './actionBar';
+import JavaBeginnerGuide from './HelpPanel';
 const mimeType = require('mime-types');
 
 
@@ -30,105 +38,64 @@ const mimeType = require('mime-types');
 
 /**
  *  */
-function XTermComponent() {
-  const terminalRef = useRef(null);
-  const dragBar = useRef(null);
-  const reference = useRef(null);
-  const m = useRef(null);
-  let temr: any;
-  const newref = useRef(null);
 
-  const [downloadProgress, setDownloadProgressUI] = useState(0);
-  let emuCtx = useEmulatorCtx();
-  let memoryContextSettings = useMemoryContext();
-  // debugger;
-  
-  useEffect(() => {
-    console.log(terminalRef.current);
-
-    (async () => {
-      
-      if (!terminalRef.current) {
-        // This should not happen
-        console.error("UseEffect triggered with unloaded terminal");
-        return;
-      }
-        
-      
-      let em = await emuCtx.emulator;
-      var fs;
-      console.log(em);
-      const xterm = await import('@xterm/xterm');
-      let fitAddon = await import("@xterm/addon-fit");
-      console.log(terminalRef);
-
-      /* eslint-disable */
-      let fadd = new fitAddon.FitAddon();
-      if (!memoryContextSettings) {
-        return;
-      }
-
-      console.log(fadd);
-      fs = memoryContextSettings.fs;
-
-
-
-      temr = new xterm.Terminal({ rows: 14 });
-
-      temr.options.fontSize = 14;
-      temr.options.lineHeight = 1;
-
-      temr.open(terminalRef.current);
-      temr.loadAddon(fadd);
-      fadd.fit();
-
-      let msgLoop = new MessageLoop();
-      msgLoop.onEmulatorEnabled(em.emulator, temr);
-      await emuCtx.waitTillDiskIsSaved();
-        em.emulator.serial0_send("\x04");
-      
-    })();
-  }, []);
-  // debugger;
-
-
-
-
-  let placeholder = (
-    <div className={`relative flex flex-grow flex-row items-center justify-items-center`}>
-
-
-    </div>
-  )
-  function switchToEditor() {
-
-  }
-
-  const mouseState = { down: false, cb: null };
-
-
-
-  return (
-
-    <div ref={terminalRef} style={{minHeight: "40%",height:'40%'}} className='flex  relative flex-1 h-screen '>
-
-
-    </div>
-
-  );
-}
 
 export default function Home() {
-
+  function Test() {
+    return (
+      <h1>Hello world</h1>
+    )
+  }
+  const DynamicRenderModalDialog = dynamic(()=>import('./modal_dialog'), {ssr: false});
+  let evtTarget = new EventTarget();
+  
+  
+  let actionItems = [
+    {
+      icon: <FilesIcon></FilesIcon>,
+      panel: FileSystemRoot,
+      name: "File Panel",
+      label: "filetree"
+    },
+    {
+      icon: <GitBranchIcon></GitBranchIcon>,
+      panel: GitPanel,
+      name: "Git Panel",
+      label: "git"
+    },
+    {
+      icon: <HelpCircleIcon></HelpCircleIcon>,
+      panel: JavaBeginnerGuide,
+      name: "Java beginners",
+      label: "linuxguide"
+    }
+    , {
+      icon: <div style={{alignSelf: "end"}}>test</div>
+    }
+  ] as ActionBarItem[];
   return (
-
+    <Nossr>
+      
     <Providers>
-      <div className="flex flex-col h-screen max-h-screen w-screen overflow-auto" >
-        <Editor></Editor>
-        <XTermComponent />
-        <DownloadProgressBar />
+    <DynamicRenderModalDialog >
+                
+                </DynamicRenderModalDialog>
+      <div className="flex flex-col h-screen max-h-screen w-screen max-w-screen overflow-auto" >
+        <ResizablePanelGroup direction="horizontal" style={{width: "100%"}}>
+          <ResizablePanel defaultSize={20} >
+        <ActionBar orientation='col' actionItems={actionItems} />
+</ResizablePanel>
+        
+        <ResizableHandle></ResizableHandle>
+        <Editor ></Editor>
+
+        
+        </ResizablePanelGroup>
+
       </div>
+
       <Prompt></Prompt>
     </Providers>
+    </Nossr>
   );
 }
