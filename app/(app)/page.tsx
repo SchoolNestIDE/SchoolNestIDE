@@ -16,7 +16,7 @@ import { useTheme } from 'next-themes';
 import { cn } from '@/app/lib/utils';
 import MainFooter from "../components/MainFooter";
 
-
+ 
 const testimonials = [
     {
         quote:

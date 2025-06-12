@@ -9,10 +9,8 @@ URL=https://update.code.visualstudio.com/commit:$(VSCODE_COMMIT)/web-standalone/
 run: 
 	npm run dev
 disk-only:
-	cd disktemplate && bash main.sh
-download-linux-kernel:
-	wget https://storage.googleapis.com/munydev.appspot.com/vmlinuz-virt -O public/vmlinuz-virt
-prepare: download-linux-kernel
+	cd minidisk && bash main.sh	
+prepare:
 	mkdir -p gen
 	mkdir -p out
 	protoc $(SRCS_PROTO) --cpp_out=gen --js_out=import_style=commonjs,binary:gen 
@@ -22,16 +20,26 @@ compile: prepare
 docker:
 	docker build -t nest_client .
 	docker run --privileged --rm -v $(shell pwd):/app nest_client make -C /app -f Makefile compile
-disk: docker
-	cd disktemplate && bash main.sh
+larger-disk:
+	cd highlyminimaljava && bash main.sh
+	@echo "Crafted larger disk, stored in compressed tar"
+disk: build_jcompserver docker
+	cd minidisk && bash main.sh
 	@echo "Created disk"
 	cd ..
 clean-disk:
-	rm public/disk || :
-	rm public/disk.gz || :
-	rm disktemplate/output.tar || :
+	rm -f public/disk || :
+	rm -f public/disk.gz || :
+	rm -f minidisk/output.tar || :
+	rm -f highlyminimaljava/output.tar || :
+	rm -f public/output.tar.gz || :
+	rm -f public/disk.larger* || :
+	docker container stop -t 0 nestdocker_larger  && docker rm nestdocker_larger || :
+	docker rmi nestdocker_larger || :
 	docker container stop -t 0 nestdocker  && docker rm nestdocker || :
 	docker rmi nestdocker || :
+build_jcompserver:
+	 docker run -v .:/mnt -it --rm i386/debian:bullseye-slim /mnt/build_fakemain.sh
 clean: clean-disk
 public/vscode:
 	wget "$(URL)" -O /tmp/vsc.zip
