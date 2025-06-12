@@ -1,6 +1,4 @@
 "use client";
-
-import { Sidebar, SidebarBody, SidebarLink } from "@/app/components/ui/sidebar";
 import {
   IconArrowLeft,
   IconBrandTabler,
@@ -1109,20 +1107,6 @@ public class CustomFileInputStream extends InputStream {
           </div>
         </div>
       )}
-
-      <Sidebar open={open} setOpen={setOpen}>
-        <SidebarBody className="justify-between gap-10 bg-slate-900">
-          <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden ml-1 mb-2 pb-6">
-            {open ? <Logo /> : <LogoIcon />}
-
-            <div className="mt-8 flex flex-col gap-2">
-              {links.map((link, idx) => (
-                <SidebarLink key={idx} link={link} />
-              ))}
-            </div>
-          </div>
-        </SidebarBody>
-      </Sidebar>
 
       <div
         className="border-r border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 backdrop-blur-xl flex flex-col"
