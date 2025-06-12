@@ -29,6 +29,7 @@ interface ResizableSidebarProps {
   installPackage: (packageName: string) => Promise<void>;
   loadingProgress: string;
   uninstallPackage: (packageName: string) => void;
+  setShowGitModal: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export const ResizableSidebar: React.FC<ResizableSidebarProps> = ({
@@ -55,6 +56,7 @@ export const ResizableSidebar: React.FC<ResizableSidebarProps> = ({
   installPackage,
   loadingProgress,
   uninstallPackage,
+  setShowGitModal,
 }) => {
   const isResizing = useRef(false);
 
@@ -105,6 +107,7 @@ export const ResizableSidebar: React.FC<ResizableSidebarProps> = ({
           handleDragLeave={handleDragLeave}
           handleDrop={handleDrop}
           getChildren={getChildren}
+          setShowGitModal={setShowGitModal}
         />
 
         <PackageManager

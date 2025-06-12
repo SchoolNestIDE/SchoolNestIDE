@@ -22,6 +22,8 @@ interface FileExplorerProps {
   handleDragLeave: () => void;
   handleDrop: (e: React.DragEvent, folderName?: string) => void;
   getChildren: (folderName: string, allFiles: File[]) => File[];
+  setShowGitModal: React.Dispatch<React.SetStateAction<boolean>>;
+  dragOverFolder?: string | null; // Add this prop to track drag state
 }
 
 export const FileExplorer: React.FC<FileExplorerProps> = ({
@@ -42,6 +44,8 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
   handleDragLeave,
   handleDrop,
   getChildren,
+  setShowGitModal,
+  dragOverFolder,
 }) => {
   return (
     <div className="p-6 -mt-2 h-full flex flex-col overflow-hidden">
@@ -55,25 +59,38 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
       <div className="flex-1 overflow-y-auto space-y-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-neutral-600 hover:scrollbar-thumb-slate-500 scrollbar-thumb-rounded-full pb-4">
         <div className="mb-4">
           <h2 className="text-sm font-semibold text-gray-300 mb-2">Files</h2>
-          <div className="space-y-1">
-            {files
-              .filter(f => !f.parentFolder)
-              .map((file) => (
-                <FileTreeItem
-                  key={file.path}
-                  file={file}
-                  activeFile={activeFile}
-                  setActiveFile={setActiveFile}
-                  removeFile={removeFile}
-                  handleDragStart={handleDragStart}
-                  handleDragOver={handleDragOver}
-                  handleDragLeave={handleDragLeave}
-                  handleDrop={handleDrop}
-                  getChildren={getChildren}
-                  files={files}
-                  setFiles={setFiles}
-                />
-              ))}
+          
+          {/* Root Directory Drop Zone */}
+          <div 
+            className={`p-2 transition-colors rounded-lg ${
+              dragOverFolder === null ? 'bg-slate-700/30 border-2 border-dashed border-slate-500' : 'border-2 border-dashed border-transparent'
+            }`}
+            onDragOver={(e) => handleDragOver(e)} // Don't pass a folder name for root
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e)} // Don't pass a folder name for root
+          >
+            <div className="text-xs text-gray-400 mb-2">Root Directory</div>
+            
+            <div className="space-y-1">
+              {files
+                .filter(f => !f.parentFolder)
+                .map((file) => (
+                  <FileTreeItem
+                    key={file.path}
+                    file={file}
+                    activeFile={activeFile}
+                    setActiveFile={setActiveFile}
+                    removeFile={removeFile}
+                    handleDragStart={handleDragStart}
+                    handleDragOver={handleDragOver}
+                    handleDragLeave={handleDragLeave}
+                    handleDrop={handleDrop}
+                    getChildren={getChildren}
+                    files={files}
+                    setFiles={setFiles}
+                  />
+                ))}
+            </div>
           </div>
         </div>
       </div>
@@ -110,6 +127,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
           </button>
 
           <button
+            onClick={() => setShowGitModal(true)}
             className="rounded-lg py-3 px-4 bg-[#304529] hover:bg-[#4a6741] text-white font-medium transition-all duration-200 border border-slate-700 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
           >
             <IconBrandGithub className="w-4 h-4" />

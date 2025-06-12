@@ -7,6 +7,13 @@ import { ResizableSidebar } from './components/ResizableSidebar';
 import { EditorPanel } from './components/EditorPanel';
 import { File } from './components/FileTreeItem';
 import { getProject, saveProject } from './db';
+import { useSession } from 'next-auth/react';
+import {
+  IconGitBranch, IconGitCommit, IconGitMerge, IconHistory,
+  IconGitFork, IconGitPullRequest, IconUpload, IconFileDownload,
+  IconFolderPlus, IconCloudUpload, IconCopy, IconCloudDownload
+} from '@tabler/icons-react';
+import { GitHubManager, GitHubClone } from './components/GitHub';
 
 declare global {
   interface Window {
@@ -17,6 +24,18 @@ declare global {
     }) => Promise<PyodideInterface>;
     pyodide: PyodideInterface;
   }
+}
+
+interface Project {
+  id: string;
+  name: string;
+  created: string;
+  lastModified: string;
+  files: { path: string; contents: string }[];
+  installedPackages: string[];
+  githubRepo?: string;
+  githubToken?: string;
+  githubBranch?: string;
 }
 
 interface PyodideInterface {
@@ -71,18 +90,6 @@ print(f"Uppercase: {text.upper()}")
 print(f"Word count: {len(text.split())}")
 `,
     },
-    {
-      filename: 'test',
-      contents: '',
-      isFolder: true,
-      path: 'test'
-    },
-    {
-      filename: 'importTest.py',
-      contents: `def hello_world():\n    print("Hello from imported module!")`,
-      parentFolder: 'test',
-      path: 'test/importTest.py'
-    },
   ]);
 
   const [activeFile, setActiveFile] = useState(files[0].path);
@@ -98,6 +105,32 @@ print(f"Word count: {len(text.split())}")
   const [draggedFile, setDraggedFile] = useState<string | null>(null);
   const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(300);
+  const [showGitModal, setShowGitModal] = useState(false);
+  const [gitProjectName, setGitProjectName] = useState('');
+  const [createdRepos, setCreatedRepos] = useState<{ owner: string; name: string }[]>([]);
+  const [isSavingProject, setIsSavingProject] = useState(false);
+  const [isCreatingRepo, setIsCreatingRepo] = useState(false);
+  const [isPushing, setIsPushing] = useState(false);
+  const [isCloning, setIsCloning] = useState(false);
+  const { data: session } = useSession();
+
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [showGitHubModal, setShowGitHubModal] = useState(false);
+  const [showCloneModal, setShowCloneModal] = useState(false);
+  
+
+  const handleUpdateProject = async (updatedProject: Project) => {
+    await saveProject(updatedProject);
+    setProject(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
+    setShowGitHubModal(false);
+    setSelectedProject(null);
+  };
+
+  const handleCloneProject = async (newProject: Project) => {
+    await saveProject(newProject);
+    setProject(prev => [newProject, ...prev]);
+    setShowCloneModal(false);
+  };
 
   const getChildren = (folderName: string, allFiles: File[]) => {
     return allFiles.filter(f => f.parentFolder === folderName);
@@ -389,17 +422,17 @@ except Exception as e:
 
   const addFolder = (parentFolder?: string) => {
     const existingFolders = files.filter(
-    f => f.isFolder && f.parentFolder === parentFolder
-  );
-  const existingNumbers = existingFolders.map(f => {
-    const match = f.filename.match(/folder(\d+)/);
-    return match ? parseInt(match[1]) : 0;
-  });
+      f => f.isFolder && f.parentFolder === parentFolder
+    );
+    const existingNumbers = existingFolders.map(f => {
+      const match = f.filename.match(/folder(\d+)/);
+      return match ? parseInt(match[1]) : 0;
+    });
     let baseName = 'folder';
     let counter = 1;
-  while (existingNumbers.includes(counter)) {
-    counter++;
-  }
+    while (existingNumbers.includes(counter)) {
+      counter++;
+    }
 
     while (files.some(f =>
       f.filename === `${baseName}${counter}` &&
@@ -498,9 +531,6 @@ except Exception as e:
 
       setOutputLines(prev => [...prev, `Successfully installed ${packageName}`]);
 
-      if (!installedPackages.includes(packageName)) {
-        setInstalledPackages(prev => [...prev, packageName]);
-      }
     } catch (error: any) {
       setInstalledPackages(prev => prev.filter(p => p !== packageName));
       setOutputLines(prev => [...prev, `Failed to install ${packageName}: ${error.message}`]);
@@ -514,10 +544,136 @@ except Exception as e:
   };
 
   const uninstallPackage = (packageName: string) => {
-  setInstalledPackages(prev => prev.filter(p => p !== packageName));
-  setOutputLines(prev => [...prev, `➖ Uninstalled ${packageName}`]);
-};
+    setInstalledPackages(prev => prev.filter(p => p !== packageName));
+    setOutputLines(prev => [...prev, `Uninstalled ${packageName}`]);
+  };
 
+  const createRepo = async (repoName: string) => {
+    setIsCreatingRepo(true);
+    try {
+      const res = await fetch("/api/github/create-repo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: repoName.trim(),
+          description: "Python project created via IDE",
+          isPrivate: true,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (data.error?.errors?.some((e: any) => e.message.includes("already exists"))) {
+          alert("Repository name already exists. Please choose a different name.");
+        } else {
+          alert("Failed to create repo: " + (data.error?.message || data.error));
+        }
+        return null;
+      }
+
+      alert(`Repo "${repoName}" created successfully!`);
+      return data;
+    } catch (error) {
+      console.error('Error creating repo:', error);
+      alert('Error creating repository. Please try again.');
+      return null;
+    } finally {
+      setIsCreatingRepo(false);
+    }
+  };
+
+  const handlePush = async (owner: string, repo: string) => {
+    setIsPushing(true);
+
+    try {
+      // Push all Python files
+      for (const file of files.filter(f => !f.isFolder)) {
+        const res = await fetch("/api/github/push", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `token ${session?.accessToken}`,
+          },
+          body: JSON.stringify({
+            owner,
+            repo,
+            path: file.path,
+            content: file.contents,
+            message: `Update ${file.filename} via Python IDE`,
+          }),
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          alert("Push failed: " + (errorData.error || "Unknown error"));
+          return;
+        }
+      }
+
+      alert("Files pushed successfully!");
+    } catch (error) {
+      console.error('Error pushing files:', error);
+      alert('Error pushing files. Please check your connection.');
+    } finally {
+      setIsPushing(false);
+    }
+  };
+
+  const handleGitOperation = async (operationName: string) => {
+    switch (operationName) {
+      case "Create Repository":
+        const newRepoName = prompt("Enter repository name:");
+        if (newRepoName && newRepoName.trim() !== "") {
+          const repo = await createRepo(newRepoName);
+          if (repo) {
+            setCreatedRepos(prev => [...prev, { owner: repo.owner.login, name: repo.name }]);
+          }
+        }
+        break;
+
+      case "Push Changes":
+        if (files.filter(f => !f.isFolder).length === 0) {
+          alert("No files to push.");
+          return;
+        }
+
+        let chosenRepo: { owner: string; name: string } | null = null;
+
+        if (createdRepos.length > 0) {
+          const repoNames = createdRepos.map((r, i) => `${i + 1}: ${r.name}`).join("\n");
+          const input = prompt(
+            `Choose repository:\n${repoNames}\n\nEnter number or leave empty for new repo:`
+          );
+
+          if (input) {
+            const index = parseInt(input, 10) - 1;
+            if (!isNaN(index) && createdRepos[index]) {
+              chosenRepo = createdRepos[index];
+            }
+          }
+        }
+
+        if (!chosenRepo) {
+          const repoName = prompt("Enter new repository name:");
+          if (!repoName) return;
+
+          const newRepo = await createRepo(repoName);
+          if (!newRepo) return;
+
+          chosenRepo = { owner: newRepo.owner.login, name: newRepo.name };
+          setCreatedRepos(prev => [...prev, chosenRepo!]);
+        }
+
+        if (chosenRepo) {
+          await handlePush(chosenRepo.owner, chosenRepo.name);
+        }
+        break;
+
+      default:
+        alert(`Operation "${operationName}" not implemented yet.`);
+    }
+  };
 
   const handleDragStart = (e: React.DragEvent, path: string) => {
     setDraggedFile(path);
@@ -536,25 +692,137 @@ except Exception as e:
     setDragOverFolder(null);
   };
 
+  const getParentFolder = (path: string) => {
+    const parts = path.split('/');
+    if (parts.length > 1) {
+      return parts.slice(0, -1).join('/');
+    }
+    return undefined;
+  };
+
   const handleDrop = (e: React.DragEvent, targetFolder?: string) => {
     e.preventDefault();
     setDragOverFolder(null);
     if (!draggedFile) return;
+
     const draggedFileObj = files.find(f => f.path === draggedFile);
     if (!draggedFileObj) return;
-    const newFiles = files.map(f =>
-      f.path === draggedFile ? {
-        ...f,
-        parentFolder: targetFolder,
-        path: targetFolder ? `${targetFolder}/${f.filename}` : f.filename
-      } : f
-    );
+
+    // Prevent dropping a folder into itself or its children
+    if (draggedFileObj.isFolder && targetFolder?.startsWith(draggedFileObj.path + '/')) {
+      return;
+    }
+
+    const oldPath = draggedFileObj.path;
+    // When targetFolder is undefined, move to root (no parent folder)
+    const newPath = targetFolder ? `${targetFolder}/${draggedFileObj.filename}` : draggedFileObj.filename;
+
+    // If the new path is the same as old path, no need to move
+    if (oldPath === newPath) return;
+
+    const newFiles = files.map(f => {
+      if (f.path === oldPath) {
+        // Move the dragged file/folder
+        return {
+          ...f,
+          path: newPath,
+          parentFolder: targetFolder // This will be undefined for root level
+        };
+      } else if (draggedFileObj.isFolder && f.path?.startsWith(`${oldPath}/`)) {
+        // If dragging a folder, update all its children paths
+        const relativePath = f.path.substring(oldPath.length + 1); // Remove old parent path + "/"
+        const newChildPath = targetFolder ? `${targetFolder}/${draggedFileObj.filename}/${relativePath}` : `${draggedFileObj.filename}/${relativePath}`;
+
+        // Calculate the new parent folder for this child
+        const pathParts = newChildPath.split('/');
+        const newParentFolder = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : undefined;
+
+        return {
+          ...f,
+          path: newChildPath,
+          parentFolder: newParentFolder
+        };
+      }
+      return f;
+    });
+
     setFiles(newFiles);
+
+    // Update active file path if it was moved
+    if (activeFile === oldPath) {
+      setActiveFile(newPath);
+    } else if (activeFile?.startsWith(`${oldPath}/`)) {
+      // If the active file is inside the moved folder, update its path too
+      const relativePath = activeFile.substring(oldPath.length + 1);
+      const newActiveFile = targetFolder ? `${targetFolder}/${draggedFileObj.filename}/${relativePath}` : `${draggedFileObj.filename}/${relativePath}`;
+      setActiveFile(newActiveFile);
+    }
+
     setDraggedFile(null);
   };
 
   const editorRef = useRef<any>(null);
   const outputRef = useRef<HTMLDivElement>(null);
+
+  const GitModal = () => (
+    showGitModal && (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-slate-900 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-white">Git Operations</h2>
+            <button
+              onClick={() => setShowGitModal(false)}
+              className="text-gray-400 hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[
+              {
+                title: "Create Repository",
+                description: "Create a new GitHub repository",
+                icon: <IconFolderPlus className="h-5 w-5" />,
+                loading: isCreatingRepo
+              },
+              {
+                title: "Push Changes",
+                description: "Push your Python files to GitHub",
+                icon: <IconCloudUpload className="h-5 w-5" />,
+                loading: isPushing
+              }
+            ].map((op) => (
+              <button
+                key={op.title}
+                onClick={() => handleGitOperation(op.title)}
+                disabled={op.loading}
+                className="p-4 bg-slate-800 hover:bg-slate-700 rounded-lg text-left transition-colors disabled:opacity-50"
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  {op.loading ? (
+                    <Loader className="h-5 w-5 animate-spin text-blue-400" />
+                  ) : (
+                    <span className="text-blue-400">{op.icon}</span>
+                  )}
+                  <h3 className="font-medium text-white">{op.title}</h3>
+                </div>
+                <p className="text-sm text-gray-400">{op.description}</p>
+              </button>
+            ))}
+          </div>
+
+          {files.filter(f => !f.isFolder).length > 0 && (
+            <div className="mt-4 p-3 bg-slate-800 rounded">
+              <p className="text-sm text-gray-300">
+                Ready to push: {files.filter(f => !f.isFolder).length} Python files
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  );
 
   return (
     <div className="rounded-md flex flex-col md:flex-row bg-black w-full flex-1 border border-slate-800 overflow-hidden h-screen">
@@ -582,6 +850,7 @@ except Exception as e:
         installPackage={installPackage}
         loadingProgress={loadingProgress}
         uninstallPackage={uninstallPackage}
+        setShowGitModal={setShowGitModal}
       />
 
       <EditorPanel
@@ -592,6 +861,8 @@ except Exception as e:
         outputLines={outputLines}
         clearOutput={clearOutput}
       />
+
+      <GitModal />
     </div>
   );
 };
