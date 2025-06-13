@@ -34,7 +34,8 @@ export interface ActionBarItem {
             return  (<Button
               key={item.label}
               variant="ghost"
-              size="lg"
+              size="sm"
+              fullWidth={false}
               style={{border: "none", borderBottom: "2px solid", borderBottomColor: "indigo"}}
               className={" "}
               onClick={() => setActivePanel(item.label)}

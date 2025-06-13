@@ -14,15 +14,11 @@ prepare:
 	mkdir -p gen
 	mkdir -p out
 
-compile: prepare
-	echo "not using protobuf"
-docker:
-	docker build -t nest_client .
-	docker run --privileged --rm -v $(shell pwd):/app nest_client make -C /app -f Makefile compile
+
 larger-disk:
 	cd highlyminimaljava && bash main.sh
 	@echo "Crafted larger disk, stored in compressed tar"
-disk: build_jcompserver docker
+disk: build_jcompserver
 	cd minidisk && bash main.sh
 	@echo "Created disk"
 	cd ..
@@ -37,7 +33,7 @@ clean-disk:
 	docker rmi nestdocker_larger || :
 	docker container stop -t 0 nestdocker  && docker rm nestdocker || :
 	docker rmi nestdocker || :
-build_jcompserver:
+build_jcompserver: 
 	 docker run -v $(shell pwd):/mnt -it --rm --platform linux/i386 i386/debian:bullseye-slim /mnt/build_fakemain.sh
 clean: clean-disk
 public/vscode:

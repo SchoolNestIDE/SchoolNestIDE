@@ -7,6 +7,17 @@ interface Connection {
     send: (buf: Uint8Array | string) => void,
     handle: (buf: Uint8Array) => void
 }
+interface ExtendedPromise<T> extends Promise<T> {
+    setResolvedValue(val: T);
+}
+function NewResolvablePromise<T>() {
+    let r: { (value: T | PromiseLike<T>): void; (val: T): any; };
+    let p = new Promise<T>(resolve=>{
+        r = resolve;
+    }) as ExtendedPromise<T>
+    p.setResolvedValue = r;
+    return p;
+}
 const waitFor = 'virtio-console0-output-bytes';
 const waitFor2 = 'virtio-console1-output-bytes';
 const writeTo = 'virtio-console0-input-bytes';
@@ -103,8 +114,9 @@ class MessageLoop {
     totalSize: number;
     rx_addr: number;
     static _instance: MessageLoop;
+    static ready: ExtendedPromise<void> = NewResolvablePromise<void>();
     static add_data_listener: ()=>void;
-    static run_program: (emulator: any, cmd: string, outputStd:(data: string)=>void, outputErr: (data:string)=>void)=>{input: (data: string)=>void, wait: ()=>Promise<void>}
+    static run_program: (emulator: any, cmd: string, outputStd:(data: string)=>void, outputErr: (data:string)=>void)=>{input: (data: string)=>void, wait: ()=>Promise<number>}
     static get instance() {
 
         this._instance ??= new MessageLoop();
@@ -114,6 +126,7 @@ class MessageLoop {
     }
     static virtio_console_bus: (emulator: any)=>void = ()=>{};
     static onEmulatorLoaded(emulator: any) {
+
     }
     onEmulatorEnabled(emulator: any, terminal: q.Terminal) {
 
@@ -121,11 +134,20 @@ class MessageLoop {
         let collector = new Uint8Array(8192);
         let cursor = 0;
         terminal.onData((byte)=>{
+            
             emulator.serial0_send(byte);
         })
         
        emulator.add_listener("serial0-output-byte", (byte: number) => {
-        
+        if (byte === "\n".charCodeAt(0)) {
+                let strLen = cursor;
+                this.onSerialLine(emulator, new TextDecoder().decode(collector));
+                cursor = 0;
+
+            }else {
+            collector[cursor++] = byte;
+
+            }
         terminal.write(new Uint8Array([byte]));
       });
     }
@@ -138,15 +160,10 @@ class MessageLoop {
         this.rx_addr = 0;
     }
     
-    onSerialLine(line: string) {
+    onSerialLine(emulator: any, line: string) {
         if (line.indexOf("ptr") === 0) {
-            Object.defineProperty(globalThis, 'msgLoop', {value: this});
-            // console.log("here");
-            console.log(line.substring(3, line.indexOf(" ")));
-            dmaBufferAddress = parseInt(line.substring(3, line.indexOf(" ")));
-            this.rx_addr = parseInt(line.substring(line.indexOf(" ") + 1));
 
-            this.emulator.add_listener(waitFor, this.everyTick.bind(this));
+            MessageLoop.ready.setResolvedValue();
         }
     }
     everyTick() {
@@ -281,29 +298,32 @@ MessageLoop.add_data_listener = function () {
 
 }
 MessageLoop.run_program =  function (emulator, cmd, output, outputErr) {
-    emulator.add_listener(getReadFrom(2), )
+    let resPromise = NewResolvablePromise<number>();
     function handleInput(data: string) {
         emulator.bus.send(getWriteTo(1), new TextEncoder().encode(data));
         
     }
-
-    emulator.add_listener(getReadFrom(1), (data: Uint8Array)=>{
+function b(data: Uint8Array){
         output(new TextDecoder().decode(data));
+        
+    }
+    
+    emulator.add_listener(getReadFrom(1), b)
+    emulator.add_listener(getReadFrom(2), function ref(dat: Uint8Array){
+        console.log("finished program with exit code "+ parseInt(new TextDecoder().decode(dat)));
+        emulator.remove_listener(getReadFrom(1), b);
+        emulator.remove_listener(getReadFrom(2), ref);
+        resPromise.setResolvedValue(parseInt(new TextDecoder().decode(dat)));
     })
     
-    emulator.bus.send(getWriteTo(0), new TextEncoder().encode(cmd));
-    setTimeout(()=>{
-    emulator.bus.send(getWriteTo(0), new TextEncoder().encode("echo done > /dev/hvc2"));
-
-    })
+    emulator.bus.send(getWriteTo(0), new TextEncoder().encode(cmd + " 1>/dev/hvc1 0</dev/hvc1; echo $? > /dev/hvc2\n"));
+    
         
 
 return {
     input: handleInput,
     wait() {
-        return new Promise((resolve)=>[
-            
-        ])
+        return resPromise;
     }
 }
 }

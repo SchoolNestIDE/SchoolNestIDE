@@ -1,5 +1,5 @@
 "use client";
-import React from 'react';
+import React, { useRef } from 'react';
 import "xterm/css/xterm.css"
 import dynamic from 'next/dynamic';
 import { GitPanel } from './git';
@@ -29,7 +29,8 @@ export default function Home() {
   }
   const DynamicRenderModalDialog = dynamic(()=>import('./modal_dialog'), {ssr: false});
   let evtTarget = new EventTarget();
-  
+    let pa = useRef(()=>{});
+
   
   let actionItems = [
     {
@@ -63,7 +64,7 @@ export default function Home() {
                 </DynamicRenderModalDialog>
       <div className="flex flex-col h-screen max-h-screen w-screen max-w-screen overflow-auto" >
                     <div className="flex flex-col items-center justify-center">
-<NavBarHeader></NavBarHeader>
+<NavBarHeader panelRef={pa}></NavBarHeader>
                     </div>
 
         <ResizablePanelGroup direction="horizontal" style={{width: "100%"}}>
@@ -73,7 +74,7 @@ export default function Home() {
 </ResizablePanel>
         
         <ResizableHandle></ResizableHandle>
-        <Editor ></Editor>
+        <Editor panelRef={pa}></Editor>
 
         
         </ResizablePanelGroup>
