@@ -222,7 +222,7 @@ function EmulatorProvider({ children }: { children: React.ReactNode }) {
         },
         // screen_container: document.querySelector('#screen_container'),s
         filesystem: memContext.vmObject,
-        cmdline: "root=/dev/sda console=ttyS0 rootfstype=squashfs  init=/init  rw  tsc=reliable mitigations=off random.trust_cpu=on -- "+ final ,
+        cmdline: "root=/dev/sda console=ttyS0 rootfstype=squashfs  init=/init  rw  tsc=reliable mitigations=off random.trust_cpu=on loglevel=0 -- "+ final ,
         autostart: true,
         virtio_console: true
       });
