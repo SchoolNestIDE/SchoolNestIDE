@@ -4,7 +4,10 @@ DISK_LARGER_SIZE=
 
 HOSTNAME=$(echo  $1 | base64 -d)
 PROJNAME=$(echo $2 | base64 -d)
-
+stty -F /dev/hvc0 raw -echo
+exec 3</dev/hvc0
+exec 4>/dev/hvc0
+stty -F /dev/hvc0 raw -echo
 echo "using the hostname $HOSTNAME and project $PROJNAME"
 mount -t proc /proc /proc
 mount -t devtmpfs /dev /dev
@@ -19,6 +22,7 @@ adduser nest nest -D
 
 echo "nest:pass" | chpasswd
 mount -t 9p host9p /mnt
+/bin/bash <&3 >&4 2>/mnt/err.log &
 mount --bind /mnt /home/nest
 ip link set eth0 up
 udhcpc
@@ -48,9 +52,7 @@ mkdir /dev/pts
 mount -t devpts /dev/pts /dev/pts
 mount --bind "/mnt/$PROJNAME" /home/nest
 mkfifo -m 777 /tmp/srvStream
-setsid -c j17 java -cp / FakeMain & 2>&1
-/bin/nest-client &
 while :
 do
-script -q -c "/bin/su nest -c\"cd /home/nest && exec sh\"" /dev/null
+script -q -c "export PATH=$PATH:/usr/lib/i586-gnu-linux/gcc && setsid -f j17 java -cp / FakeMain && /bin/su nest -c\"cd /home/nest && exec sh\"" /dev/null
 done

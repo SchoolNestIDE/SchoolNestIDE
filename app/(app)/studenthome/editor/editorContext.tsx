@@ -1,5 +1,5 @@
 import { Monaco } from '@monaco-editor/react';
-import type { editor } from 'monaco-editor';
+import { editor } from 'monaco-editor';
 import dynamic from 'next/dynamic';
 import * as React from 'react';
 import { useMemoryContext } from './filesystem';
@@ -9,12 +9,14 @@ import localforage from 'localforage';
 import { StorageType } from '../storage_config';
 import { ResizablePanelGroup,ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { ActionBar, ActionBarItem } from './actionBar';
-import { FilesIcon, GitBranchIcon, HelpCircleIcon } from 'lucide-react';
+import { FilesIcon, GitBranchIcon, HelpCircleIcon, PlayIcon } from 'lucide-react';
 import { GitPanel } from './git';
 import JavaBeginnerGuide from './HelpPanel';
 import { MessageLoop } from './ipc';
 import { useEmulatorCtx } from './emulator';
 import { FitAddon } from '@xterm/addon-fit';
+import { Button } from '@nextui-org/react';
+import { showPrompt } from './prompt';
 const mimeType = require('mime-types');
 const ps = require('path');
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
@@ -134,6 +136,53 @@ function a(am: any) {
 
   );
 }
+async function RunDefaultRunConfigurationForFile(emulator: any, editorContext: EditorContextType) {
+  if (!editorContext.path) {
+    await showPrompt('Select a file and then try running the file again',false,false);
+    return;
+  }
+let mt = mimeType.lookup(editorContext.path);
+if (mt) {
+  if (mt === "text/x-java-source") {
+    // found java file.
+    let rPath = '/mnt' + editorContext.path;
+    console.log("RUnning file at "+ rPath);
+    MessageLoop.run_program(emulator, "echo hi ", (dat)=>{
+      
+    }, (data)=>{
+    });
+
+  }
+}
+}
+function Runbar() {
+  let ectx = useEmulatorCtx();
+  let edCtx = useEditorContext();
+  let data = React.use((async()=>{
+    return await ectx.emulator;
+  })());
+  let em = data.emulator;
+  function OnRun() {
+      RunDefaultRunConfigurationForFile(em,edCtx);
+  }
+  return (
+    <Button color="success"  size="sm" className={'w-fit'} onPress={OnRun}>
+      <div>Run</div><PlayIcon className={"pl-[4pt]"}></PlayIcon>
+    </Button>
+  )
+}
+function NavBarHeader() {
+  let emCtx =useEmulatorCtx();
+  return (
+    <React.Suspense fallback={(<Button disabled>
+      <div>Run</div><PlayIcon className={"pl-[4pt]"}></PlayIcon>
+    </Button>)}>
+      <Runbar></Runbar>
+    
+    </React.Suspense>
+
+  )
+}
 const EditorContextTypeContext = React.createContext<EditorContextType | undefined>(undefined);
 const TabsView: React.FC<EditorTabProp> = function (props) {
   const { edt, onOpen, onClose } = props;
@@ -197,7 +246,6 @@ function Editor() {
   
   return (
     <>
-    
     <ResizablePanel className={"max-h-screen"}>
       <ResizablePanelGroup direction="vertical">
            
@@ -301,4 +349,4 @@ return (
 function useEditorContext() {
   return React.useContext(EditorContextTypeContext);
 }
-export { EditorContextProvider, Editor, useEditorContext }
+export { EditorContextProvider, Editor, useEditorContext, NavBarHeader }

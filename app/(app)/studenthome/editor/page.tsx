@@ -6,7 +6,7 @@ import { GitPanel } from './git';
 import { FileSystemRoot } from './filepanel';
 import Prompt from './prompt';
 import { Providers } from './providers';
-import { Editor } from './editorContext';
+import { Editor, NavBarHeader } from './editorContext';
 import Nossr from './nossr';
 import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from '@/components/ui/resizable'
 import { FilesIcon, GitBranchIcon, HelpCircleIcon } from 'lucide-react';
@@ -56,13 +56,18 @@ export default function Home() {
   ] as ActionBarItem[];
   return (
     <Nossr>
-      
     <Providers>
+
     <DynamicRenderModalDialog >
                 
                 </DynamicRenderModalDialog>
       <div className="flex flex-col h-screen max-h-screen w-screen max-w-screen overflow-auto" >
+                    <div className="flex flex-col items-center justify-center">
+<NavBarHeader></NavBarHeader>
+                    </div>
+
         <ResizablePanelGroup direction="horizontal" style={{width: "100%"}}>
+
           <ResizablePanel defaultSize={20} >
         <ActionBar orientation='col' actionItems={actionItems} />
 </ResizablePanel>

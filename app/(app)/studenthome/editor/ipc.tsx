@@ -8,7 +8,14 @@ interface Connection {
     handle: (buf: Uint8Array) => void
 }
 const waitFor = 'virtio-console0-output-bytes';
+const waitFor2 = 'virtio-console1-output-bytes';
 const writeTo = 'virtio-console0-input-bytes';
+function getWriteTo(num: number) {
+    return 'virtio-console' + num + "-input-bytes";
+}
+function getReadFrom(num: number) {
+    return 'virtio-console' + num + "-output-bytes";
+}
 interface ExtendedWebViewerConnection extends Connection {
     id: number
 }
@@ -96,6 +103,8 @@ class MessageLoop {
     totalSize: number;
     rx_addr: number;
     static _instance: MessageLoop;
+    static add_data_listener: ()=>void;
+    static run_program: (emulator: any, cmd: string, outputStd:(data: string)=>void, outputErr: (data:string)=>void)=>{input: (data: string)=>void, wait: ()=>Promise<void>}
     static get instance() {
 
         this._instance ??= new MessageLoop();
@@ -268,9 +277,41 @@ function send_connect_packet(msgLoop: MessageLoop, port: number, handler: (buffe
     
     return result;
 }
+MessageLoop.add_data_listener = function () {
+
+}
+MessageLoop.run_program =  function (emulator, cmd, output, outputErr) {
+    emulator.add_listener(getReadFrom(2), )
+    function handleInput(data: string) {
+        emulator.bus.send(getWriteTo(1), new TextEncoder().encode(data));
+        
+    }
+
+    emulator.add_listener(getReadFrom(1), (data: Uint8Array)=>{
+        output(new TextDecoder().decode(data));
+    })
+    
+    emulator.bus.send(getWriteTo(0), new TextEncoder().encode(cmd));
+    setTimeout(()=>{
+    emulator.bus.send(getWriteTo(0), new TextEncoder().encode("echo done > /dev/hvc2"));
+
+    })
+        
+
+return {
+    input: handleInput,
+    wait() {
+        return new Promise((resolve)=>[
+            
+        ])
+    }
+}
+}
 MessageLoop.virtio_console_bus = function (emulator: any) {
     emulator.add_listener(waitFor, function (msg: Uint8Array) {
         console.log(new TextDecoder().decode(msg));
-    })
+    });
+
+
 }
 export {MessageLoop, open_webviewer};

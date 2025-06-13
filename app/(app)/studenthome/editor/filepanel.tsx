@@ -184,7 +184,7 @@ function FileSystemNode({ path, padding, visibility, root, directory }: {
           <IconArrowDown size="12pt"></IconArrowDown>
         ) : (
           <IconArrowRight size="12pt"></IconArrowRight>
-        )): (<FileIcon size="12pt"></FileIcon>)}{path.split('/').slice(-1)[0]}</div>
+        )): (<FileIcon size="12pt" style={{padding: "2pt"}}></FileIcon>)}{path.split('/').slice(-1)[0]}</div>
       <div style={{ display: viz ? "block" : "none" }}>
         {fileList.map(({ name, directory }, idx) => {
           return (
