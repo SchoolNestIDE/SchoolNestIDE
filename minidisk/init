@@ -48,7 +48,7 @@ mkdir /dev/pts
 mount -t devpts /dev/pts /dev/pts
 mount --bind "/mnt/$PROJNAME" /home/nest
 mkfifo -m 777 /tmp/srvStream
-j17 java -cp / FakeMain & 2>&1 | sed 's/$/\r/'
+setsid -c j17 java -cp / FakeMain & 2>&1
 /bin/nest-client &
 while :
 do

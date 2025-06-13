@@ -432,7 +432,9 @@ export default function Page() {
             <Nossr>
                 <IndexedDBProvider>
                     <ModalDialogProvider>
-
+                        <RenderModalDialog>
+                            
+                        </RenderModalDialog>
                         <FloatingNav />
                         
 

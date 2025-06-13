@@ -130,7 +130,7 @@ function a(am: any) {
 }
 
   return (
-      <div style={{height: "auto"}} ref={terminalRef}></div>
+      <div style={{height: "100%"}} ref={terminalRef}></div>
 
   );
 }
@@ -173,7 +173,7 @@ function Editor() {
       return;
     }
     ec.path = ed.path;
-    ec.load();
+        ec.load();
   }
   const onTabClose = function (ed: EditorTab) {
     if (!ec) {
@@ -198,7 +198,7 @@ function Editor() {
   return (
     <>
     
-    <ResizablePanel>
+    <ResizablePanel className={"max-h-screen"}>
       <ResizablePanelGroup direction="vertical">
            
           <ResizablePanel >

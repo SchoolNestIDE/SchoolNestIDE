@@ -270,9 +270,7 @@ function send_connect_packet(msgLoop: MessageLoop, port: number, handler: (buffe
 }
 MessageLoop.virtio_console_bus = function (emulator: any) {
     emulator.add_listener(waitFor, function (msg: Uint8Array) {
-        if (new TextDecoder().decode(msg) === 'c') return;
         console.log(new TextDecoder().decode(msg));
-        emulator.bus.send(writeTo, new TextEncoder().encode('a'));
     })
 }
 export {MessageLoop, open_webviewer};
