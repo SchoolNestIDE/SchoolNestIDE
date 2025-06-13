@@ -38,7 +38,7 @@ clean-disk:
 	docker container stop -t 0 nestdocker  && docker rm nestdocker || :
 	docker rmi nestdocker || :
 build_jcompserver:
-	 docker run -v $(PWD):/mnt -it --rm --platform linux/i386 i386/debian:bullseye-slim /mnt/build_fakemain.sh
+	 docker run -v $(shell pwd):/mnt -it --rm --platform linux/i386 i386/debian:bullseye-slim /mnt/build_fakemain.sh
 clean: clean-disk
 public/vscode:
 	wget "$(URL)" -O /tmp/vsc.zip
