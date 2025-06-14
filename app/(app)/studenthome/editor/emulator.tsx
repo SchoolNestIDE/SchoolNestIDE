@@ -179,7 +179,13 @@ function EmulatorProvider({ children }: { children: React.ReactNode }) {
       
       mdCtx.setModalContents(null);
       mdCtx.setModalVisibility(false);
-      let u = new URL(location.href);
+      let inp = await fetch('/env.json');
+      let txt = await inp.json();
+      let locationt = txt.baseUri;
+      if (!locationt || locationt==="default") {
+        locationt =location.href
+      }
+      let u = new URL(locationt);
       u.pathname = "";
       u.protocol = "http:";
 
@@ -216,7 +222,7 @@ function EmulatorProvider({ children }: { children: React.ReactNode }) {
         },
         // screen_container: document.querySelector('#screen_container'),s
         filesystem: memContext.vmObject,
-        cmdline: "root=/dev/sda console=ttyS0 rootfstype=squashfs  init=/init rw  tsc=reliable mitigations=off random.trust_cpu=on -- " + final ,
+        cmdline: "root=/dev/sda console=ttyS0 rootfstype=squashfs  init=/init  rw  tsc=reliable mitigations=off random.trust_cpu=on loglevel=0 -- "+ final ,
         autostart: true,
         virtio_console: true
       });
@@ -225,6 +231,9 @@ function EmulatorProvider({ children }: { children: React.ReactNode }) {
         emulator: emu,
         msgLoop: null
       };
+      Object.assign(globalThis, {
+        emulatorCtx: c._emulator
+      })
       setTimeout(async ()=>{
         await emu.fs9p.initialize();
               // await downloadLargerToVirtualDisk(c, emu.fs9p);

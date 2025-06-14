@@ -1,34 +1,15 @@
 "use client";
-import React, { createContext, ReactNode, Ref, useContext, useEffect, useRef, useState, } from 'react';
+import React, { useRef } from 'react';
 import "xterm/css/xterm.css"
-import Image from 'next/image';
 import dynamic from 'next/dynamic';
-import * as ps from 'path';
-import { urlToHttpOptions } from 'url';
-import * as octokit from '@octokit/rest'
-import { IconBrandAdobeAfterEffect } from '@tabler/icons-react';
 import { GitPanel } from './git';
-import { Button, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger
- } from '@nextui-org/react';
-import { useMemoryContext } from './filesystem';
-import { FilePanel, filePanelState, FileSystemRoot } from './filepanel';
-import Breadcrumb, { WriteState } from './breadcrumb';
-import {DownloadProgressBar} from './progressbar';
-import { ADDRGETNETWORKPARAMS } from 'dns';
-import { DB } from './indexeddb';
+import { FileSystemRoot } from './filepanel';
 import Prompt from './prompt';
-import { number } from 'motion/react';
 import { Providers } from './providers';
-import { editor } from 'monaco-editor';
-import { useEmulatorCtx } from './emulator';
-import { MessageLoop } from './ipc';
-import { Editor } from './editorContext';
-import { tmpdir } from 'os';
+import { Editor, NavBarHeader } from './editorContext';
 import Nossr from './nossr';
 import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from '@/components/ui/resizable'
-import { FitAddon } from '@xterm/addon-fit';
-import { useModalDialogCtx } from './ModalDialog';
-import { Files, FilesIcon, GitBranchIcon, HelpCircleIcon } from 'lucide-react';
+import { FilesIcon, GitBranchIcon, HelpCircleIcon } from 'lucide-react';
 import { ActionBar, ActionBarItem } from './actionBar';
 import JavaBeginnerGuide from './HelpPanel';
 const mimeType = require('mime-types');
@@ -48,7 +29,8 @@ export default function Home() {
   }
   const DynamicRenderModalDialog = dynamic(()=>import('./modal_dialog'), {ssr: false});
   let evtTarget = new EventTarget();
-  
+    let pa = useRef(()=>{});
+
   
   let actionItems = [
     {
@@ -75,19 +57,24 @@ export default function Home() {
   ] as ActionBarItem[];
   return (
     <Nossr>
-      
     <Providers>
+
     <DynamicRenderModalDialog >
                 
                 </DynamicRenderModalDialog>
       <div className="flex flex-col h-screen max-h-screen w-screen max-w-screen overflow-auto" >
+                    <div className="flex flex-col items-center justify-center">
+<NavBarHeader panelRef={pa}></NavBarHeader>
+                    </div>
+
         <ResizablePanelGroup direction="horizontal" style={{width: "100%"}}>
-          <ResizablePanel defaultSize={20} >
+
+          <ResizablePanel defaultSize={40} >
         <ActionBar orientation='col' actionItems={actionItems} />
 </ResizablePanel>
         
         <ResizableHandle></ResizableHandle>
-        <Editor ></Editor>
+        <Editor panelRef={pa}></Editor>
 
         
         </ResizablePanelGroup>

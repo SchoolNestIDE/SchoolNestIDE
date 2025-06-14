@@ -10,12 +10,9 @@ if [ -z "$MOUNT_DIR" ]
 then
     exit 0;
 fi
-mount -t tmpfs -o exec none "$MOUNT_DIR"
 sudo tar -C "$MOUNT_DIR" -xf output.tar
 
 #make -C .. docker
-sudo cp -rf ../out/nest-client "${MOUNT_DIR}"/bin/nest-client
-sudo chown 0:0 "${MOUNT_DIR}"/bin/nest-client
 sudo cp ./init "${MOUNT_DIR}"/init
 sudo chmod +x "${MOUNT_DIR}"/init
 sudo setcap "cap_sys_admin=ep" "$MOUNT_DIR"/bin/nest-client 

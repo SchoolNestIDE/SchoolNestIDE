@@ -1,5 +1,5 @@
 import { Monaco } from '@monaco-editor/react';
-import type { editor } from 'monaco-editor';
+import { editor } from 'monaco-editor';
 import dynamic from 'next/dynamic';
 import * as React from 'react';
 import { useMemoryContext } from './filesystem';
@@ -7,14 +7,20 @@ import ThemeSwitcher from '@/app/components/ThemeSwitcher';
 import { FilePanel, FileSystemRoot } from './filepanel';
 import localforage from 'localforage';
 import { StorageType } from '../storage_config';
-import { ResizablePanelGroup,ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { ActionBar, ActionBarItem } from './actionBar';
-import { FilesIcon, GitBranchIcon, HelpCircleIcon } from 'lucide-react';
+import { FilesIcon, GitBranchIcon, HelpCircleIcon, PlayIcon } from 'lucide-react';
 import { GitPanel } from './git';
 import JavaBeginnerGuide from './HelpPanel';
 import { MessageLoop } from './ipc';
 import { useEmulatorCtx } from './emulator';
 import { FitAddon } from '@xterm/addon-fit';
+import { Button, ringClasses } from '@nextui-org/react';
+import { showPrompt } from './prompt';
+import path from 'path';
+import SwitchablePanel, { PanelDefinition } from './NonRerenderingPanel';
+import { markCurrentScopeAsDynamic } from 'next/dist/server/app-render/dynamic-rendering';
+import { Terminal } from '@xterm/xterm';
 const mimeType = require('mime-types');
 const ps = require('path');
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
@@ -28,9 +34,9 @@ interface EditorContextType {
   get fs(): typeof import('fs') | null;
   set fs(fs: typeof import('fs'));
   editor?: editor.IStandaloneCodeEditor,
-  getRepoName(projectName: string): Promise<string|null>
-  getUserName(projectName: string): Promise<string|null>
-  getBranchName(projectName: string): Promise<string|null>
+  getRepoName(projectName: string): Promise<string | null>
+  getUserName(projectName: string): Promise<string | null>
+  getBranchName(projectName: string): Promise<string | null>
 }
 interface EditorTab {
   path: string,
@@ -41,30 +47,31 @@ interface EditorTabProp {
   onOpen?: (editorTab: EditorTab) => void,
   onClose?: (editorTab: EditorTab) => void
 }
-function XTermComponent({evtTarget}:{evtTarget: EventTarget}) {
-  
+type EnabledOverride = (emu: any, terminal: Terminal) => void;
+function XTermComponent({ evtTarget, onEmEnableOverride }: { onEmEnableOverride?: EnabledOverride, evtTarget: EventTarget }) {
+
   const terminalRef = React.useRef(null);
 
 
   const [downloadProgress, setDownloadProgressUI] = React.useState(0);
-  const [fitAddon, setFitAddon] = React.useState<FitAddon|null>(null);
+  const [fitAddon, setFitAddon] = React.useState<FitAddon | null>(null);
   let emuCtx = useEmulatorCtx();
   let memoryContextSettings = useMemoryContext();
   // debugger;
-  
+
   React.useEffect(() => {
     let temr;
     console.log(terminalRef.current);
 
     setTimeout((async () => {
-      
+
       if (!terminalRef.current) {
         // This should not happen
         console.error("UseEffect triggered with unloaded terminal");
         return;
       }
-        
-      
+
+
       let em = await emuCtx.emulator;
       var fs;
       console.log(em);
@@ -83,7 +90,7 @@ function XTermComponent({evtTarget}:{evtTarget: EventTarget}) {
 
 
 
-      temr = new xterm.Terminal({ });
+      temr = new xterm.Terminal({});
 
       temr.options.fontSize = 14;
       temr.options.lineHeight = 1;
@@ -91,9 +98,15 @@ function XTermComponent({evtTarget}:{evtTarget: EventTarget}) {
       temr.open(terminalRef.current);
       temr.loadAddon(fadd);
       setFitAddon(fadd);
-      evtTarget.addEventListener('resize', ()=>{
+
+      evtTarget.addEventListener('resize', () => {
         fadd.fit();
       })
+      if (onEmEnableOverride) {
+        onEmEnableOverride(em, temr);
+        fadd.fit();
+        return;
+      }
       let msgLoop = new MessageLoop();
       em.msgLoop = msgLoop;
       msgLoop.onEmulatorEnabled(em.emulator, temr);
@@ -120,19 +133,110 @@ function XTermComponent({evtTarget}:{evtTarget: EventTarget}) {
 
   const mouseState = { down: false, cb: null };
 
-function a(am: any) {
-  if (!fitAddon) {
-    return;
-  }
-  console.log(am);
-  fitAddon.fit();
+  function a(am: any) {
+    if (!fitAddon) {
+      return;
+    }
+    console.log(am);
+    fitAddon.fit();
 
-}
+  }
 
   return (
-      <div style={{height: "auto"}} ref={terminalRef}></div>
+    <div style={{ height: "100%" }} ref={terminalRef}></div>
 
   );
+}
+let NewTermComp = React.memo(({onEmEnableOverride}: {onEmEnableOverride?: EnabledOverride})=>{
+  return (
+    <XTermComponent evtTarget={evtTarget} onEmEnableOverride={onEmEnableOverride}></XTermComponent>
+  )
+})
+async function RunDefaultRunConfigurationForFile(pa: (md: PanelDefinition) => void, emulator: any, editorContext: EditorContextType) {
+  if (!editorContext.path) {
+    await showPrompt('Select a file and then try running the file again', false, false);
+    return;
+  }
+  return new Promise<void>((resolve)=>{
+  let mt = mimeType.lookup(editorContext.path);
+
+  if (mt) {
+    if (mt === "text/x-java-source") {
+      // found java file.
+      let rPath = '/mnt' + editorContext.path;
+      console.log("RUnning file at " + rPath);
+      
+      let o: EnabledOverride = async (e, t)=>{
+              let cmd = "j17_optimized " + rPath;
+        t.writeln(cmd);
+let process = MessageLoop.run_program(emulator,cmd, async (dat) => {
+        console.log(dat);
+      }, (data) => {
+        console.error(data);
+
+      });
+      let classpath = path.basename(rPath);
+      let className = classpath.split('.')[0];
+
+      let err = await process.wait();
+      let dname = path.dirname(rPath);
+      cmd ="j17 java -cp " + JSON.stringify(dname) + " " + className;
+        t.writeln(cmd);
+
+      let process2 = MessageLoop.run_program(emulator, cmd, (dat) => {
+        t.write(dat);
+      }, (data) => {
+        console.error(data);
+
+      });
+      await process2.wait();
+      resolve();
+      }
+      let SS = <NewTermComp onEmEnableOverride={o}></NewTermComp>
+      pa({
+        label: crypto.randomUUID(),
+        content: SS,
+        makeActive: true
+      });
+      console.log('success');
+    }
+  }
+  });
+}
+function Runbar({ panelRef }: { panelRef: React.MutableRefObject<(md: PanelDefinition) => void> }) {
+  let ectx = useEmulatorCtx();
+  let edCtx = useEditorContext();
+    let [enabled, setEnabled] = React.useState(false);
+
+  let data = React.use((async () => {
+    let em = await ectx.emulator;
+    await MessageLoop.ready;
+    return em;
+  })());
+  let em = data.emulator;
+  function OnRun() {
+    setEnabled(false);
+    RunDefaultRunConfigurationForFile(panelRef.current, em, edCtx).then(()=>{
+      setEnabled(true);
+    });
+  }
+  return (
+    <Button color="success" size="sm" className={'w-fit'} onPress={OnRun} disabled>
+      <div>Run</div><PlayIcon className={"pl-[4pt]"}></PlayIcon>
+    </Button>
+  )
+}
+function NavBarHeader({ panelRef }: { panelRef: React.MutableRefObject<(pd: PanelDefinition) => void> }) {
+  let emCtx = useEmulatorCtx();
+  return (
+    <React.Suspense fallback={(<Button size="sm" disabled>
+      <div>Run</div><PlayIcon className={"pl-[4pt]"}></PlayIcon>
+    </Button>)}>
+      <Runbar panelRef={panelRef}></Runbar>
+
+    </React.Suspense>
+
+  )
 }
 const EditorContextTypeContext = React.createContext<EditorContextType | undefined>(undefined);
 const TabsView: React.FC<EditorTabProp> = function (props) {
@@ -163,11 +267,13 @@ const TabsView: React.FC<EditorTabProp> = function (props) {
   )
 }
 let evtTarget = new EventTarget();
-function Editor() {
+let Comp = React.memo(({ evtTarget }: { evtTarget: EventTarget }) => { return <XTermComponent evtTarget={evtTarget}></XTermComponent> });
+function Editor({ panelRef }: { panelRef: React.MutableRefObject<(newPanel: PanelDefinition) => void> }) {
   console.log(localforage);
   let ec = React.useContext(EditorContextTypeContext);
   let [tabs, setTabs] = React.useState([] as EditorTab[]);
   let r = React.useRef(tabs);
+
   const onTabOpen = function (ed: EditorTab) {
     if (!ec) {
       return;
@@ -183,37 +289,42 @@ function Editor() {
     ec.path = "null";
     ec.editor?.getModel()?.setValue("Open a tab to start editing...");
   }
-
+  let q: PanelDefinition[] = [
+    {
+      label: "Shell",
+      content: <Comp evtTarget={evtTarget} ></Comp>
+    }
+  ]
   if (!ec) {
     return (
       <h1>Ensure this is wrapped in a EditorContextProvider</h1>
     );
   }
-  let MonacoEditor = dynamic(()=>import('@monaco-editor/react'),{ssr: false});
+  let MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
   function dispatchResize() {
     evtTarget.dispatchEvent(new Event('resize'));
   }
-  
-  
+
+
   return (
     <>
-    
-    <ResizablePanel>
-      <ResizablePanelGroup direction="vertical">
-           
-          <ResizablePanel >
-        <MonacoEditor  beforeMount={(mon)=>{
-          ec.monaco = mon
-          }}  onChange={ec.onChange.bind(ec)} onMount={(editor)=>{
-            if (ec.monaco){ec.monaco.editor.setTheme('vs-dark')};ec.editor = editor}} ></MonacoEditor>
+      <ResizablePanel className={"max-h-screen"}>
+        <ResizablePanelGroup direction="vertical">
 
-          </ResizablePanel>   
-          <ResizableHandle style={{width: "20px"}} withHandle ></ResizableHandle>
-            <ResizablePanel onResize={dispatchResize}>
-              <XTermComponent evtTarget={evtTarget}/>
-            </ResizablePanel>
-      </ResizablePanelGroup>
-    </ResizablePanel>
+          <ResizablePanel >
+            <MonacoEditor beforeMount={(mon) => {
+              ec.monaco = mon
+            }} onChange={ec.onChange.bind(ec)} onMount={(editor) => {
+              if (ec.monaco) { ec.monaco.editor.setTheme('vs-dark') }; ec.editor = editor; ec.editor.updateOptions({ readOnly: true }); editor.getModel().setValue("Please select a file before you edit this.")
+            }} ></MonacoEditor>
+
+          </ResizablePanel>
+          <ResizableHandle style={{ height: "20px" }}  ></ResizableHandle>
+          <ResizablePanel onResize={dispatchResize}>
+            <SwitchablePanel panels={q} pRef={panelRef}></SwitchablePanel>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </ResizablePanel>
     </>
   )
 }
@@ -245,60 +356,62 @@ function EditorContextProvider({ children }: { children: React.ReactNode }) {
       }
       return m.githubBranch;
     },
-    async getRepoName(projectName: string){
+    async getRepoName(projectName: string) {
       let m = (await getProject(projectName));
       if (!m) {
         return null;
       }
       return m.githubRepo;
     },
-      async getUserName(projectName: string) {
-        let m = (await getProject(projectName));
-        if (!m) {
-          return null;
-        }
-        return m.githubUsername;
-  },
-  onChange: async function (value?: string) {
-    // console.log(this.editor);
-    if (!this.path) return;
-    let m = this.path;
-    let q = this.fs as any;
-    let { id } = q.SearchPath(m);
-    q.OpenInode(id, id);
-    q.Write(id, 0, value?.length, new TextEncoder().encode(value));
-    q.ChangeSize(id, value?.length);
-    await q.CloseInode(id);
-  },
-  load: async function () {
-    if (!this.path || !this.monaco || !this.editor) return;
-    // console.log(ps.extname(this.path));
-    // console.log(mimeType.lookup(ps.extname(this.path)));
-    this.monaco.editor.setModelLanguage(this.editor.getModel() as editor.ITextModel, mimeType.lookup(ps.extname(this.path)));
-    let buff = await (this.fs as any).read_file(this.path);
-    // console.log(val);
-    if (!this.monaco) { return; }
-    this.editor.getModel()?.setValue(new TextDecoder().decode(buff.slice()));
+    async getUserName(projectName: string) {
+      let m = (await getProject(projectName));
+      if (!m) {
+        return null;
+      }
+      return m.githubUsername;
+    },
+    onChange: async function (value?: string) {
+      // console.log(this.editor);
+      if (!this.path) return;
+      let m = this.path;
+      let q = this.fs as any;
+      let { id } = q.SearchPath(m);
+      q.OpenInode(id, id);
+      q.Write(id, 0, value?.length, new TextEncoder().encode(value));
+      q.ChangeSize(id, value?.length);
+      await q.CloseInode(id);
+    },
+    load: async function () {
+
+      if (!this.path || !this.monaco || !this.editor) return;
+      this.editor.updateOptions({ readOnly: false });
+      // console.log(ps.extname(this.path));
+      // console.log(mimeType.lookup(ps.extname(this.path)));
+      this.monaco.editor.setModelLanguage(this.editor.getModel() as editor.ITextModel, mimeType.lookup(ps.extname(this.path)));
+      let buff = await (this.fs as any).read_file(this.path);
+      // console.log(val);
+      if (!this.monaco) { return; }
+      this.editor.getModel()?.setValue(new TextDecoder().decode(buff.slice()));
 
 
-  },
-  path: null,
+    },
+    path: null,
     _fs: null,
-      set fs(fs: typeof import('fs')) {
-    this._fs = fs;
-  },
-  get fs() {
-    return this._fs as any;
+    set fs(fs: typeof import('fs')) {
+      this._fs = fs;
+    },
+    get fs() {
+      return this._fs as any;
+    }
   }
-}
-return (
-  <EditorContextTypeContext.Provider value={editorContext}>
-    {children}
-  </EditorContextTypeContext.Provider>
-)
+  return (
+    <EditorContextTypeContext.Provider value={editorContext}>
+      {children}
+    </EditorContextTypeContext.Provider>
+  )
 
 }
 function useEditorContext() {
   return React.useContext(EditorContextTypeContext);
 }
-export { EditorContextProvider, Editor, useEditorContext }
+export { EditorContextProvider, Editor, useEditorContext, NavBarHeader }

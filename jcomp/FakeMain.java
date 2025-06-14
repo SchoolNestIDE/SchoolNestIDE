@@ -16,8 +16,7 @@ public class FakeMain {
 
 
     public static void main(String[] args) throws Exception{
-        System.out.println("Classes have been loaded");
-        System.out.println(Arrays.toString(args));
+        System.out.println("\nptr\n");
         BufferedReader r = new BufferedReader(new InputStreamReader(System.in));
         String line;
         Base64.Decoder dec = Base64.getDecoder();
