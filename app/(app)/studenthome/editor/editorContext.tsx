@@ -104,6 +104,7 @@ function XTermComponent({ evtTarget, onEmEnableOverride }: { onEmEnableOverride?
       })
       if (onEmEnableOverride) {
         onEmEnableOverride(em, temr);
+        fadd.fit();
         return;
       }
       let msgLoop = new MessageLoop();
@@ -156,6 +157,7 @@ async function RunDefaultRunConfigurationForFile(pa: (md: PanelDefinition) => vo
     await showPrompt('Select a file and then try running the file again', false, false);
     return;
   }
+  return new Promise<void>((resolve)=>{
   let mt = mimeType.lookup(editorContext.path);
 
   if (mt) {
@@ -188,20 +190,24 @@ let process = MessageLoop.run_program(emulator,cmd, async (dat) => {
 
       });
       await process2.wait();
-      
+      resolve();
       }
       let SS = <NewTermComp onEmEnableOverride={o}></NewTermComp>
       pa({
         label: crypto.randomUUID(),
-        content: SS
+        content: SS,
+        makeActive: true
       });
       console.log('success');
     }
   }
+  });
 }
 function Runbar({ panelRef }: { panelRef: React.MutableRefObject<(md: PanelDefinition) => void> }) {
   let ectx = useEmulatorCtx();
   let edCtx = useEditorContext();
+    let [enabled, setEnabled] = React.useState(false);
+
   let data = React.use((async () => {
     let em = await ectx.emulator;
     await MessageLoop.ready;
@@ -209,10 +215,13 @@ function Runbar({ panelRef }: { panelRef: React.MutableRefObject<(md: PanelDefin
   })());
   let em = data.emulator;
   function OnRun() {
-    RunDefaultRunConfigurationForFile(panelRef.current, em, edCtx);
+    setEnabled(false);
+    RunDefaultRunConfigurationForFile(panelRef.current, em, edCtx).then(()=>{
+      setEnabled(true);
+    });
   }
   return (
-    <Button color="success" size="sm" className={'w-fit'} onPress={OnRun}>
+    <Button color="success" size="sm" className={'w-fit'} onPress={OnRun} disabled>
       <div>Run</div><PlayIcon className={"pl-[4pt]"}></PlayIcon>
     </Button>
   )
@@ -220,7 +229,7 @@ function Runbar({ panelRef }: { panelRef: React.MutableRefObject<(md: PanelDefin
 function NavBarHeader({ panelRef }: { panelRef: React.MutableRefObject<(pd: PanelDefinition) => void> }) {
   let emCtx = useEmulatorCtx();
   return (
-    <React.Suspense fallback={(<Button disabled>
+    <React.Suspense fallback={(<Button size="sm" disabled>
       <div>Run</div><PlayIcon className={"pl-[4pt]"}></PlayIcon>
     </Button>)}>
       <Runbar panelRef={panelRef}></Runbar>
@@ -282,7 +291,7 @@ function Editor({ panelRef }: { panelRef: React.MutableRefObject<(newPanel: Pane
   }
   let q: PanelDefinition[] = [
     {
-      label: "test",
+      label: "Shell",
       content: <Comp evtTarget={evtTarget} ></Comp>
     }
   ]
@@ -310,7 +319,7 @@ function Editor({ panelRef }: { panelRef: React.MutableRefObject<(newPanel: Pane
             }} ></MonacoEditor>
 
           </ResizablePanel>
-          <ResizableHandle style={{ width: "20px" }} withHandle ></ResizableHandle>
+          <ResizableHandle style={{ height: "20px" }}  ></ResizableHandle>
           <ResizablePanel onResize={dispatchResize}>
             <SwitchablePanel panels={q} pRef={panelRef}></SwitchablePanel>
           </ResizablePanel>

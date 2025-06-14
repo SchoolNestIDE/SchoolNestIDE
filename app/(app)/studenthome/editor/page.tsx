@@ -69,7 +69,7 @@ export default function Home() {
 
         <ResizablePanelGroup direction="horizontal" style={{width: "100%"}}>
 
-          <ResizablePanel defaultSize={20} >
+          <ResizablePanel defaultSize={40} >
         <ActionBar orientation='col' actionItems={actionItems} />
 </ResizablePanel>
         
