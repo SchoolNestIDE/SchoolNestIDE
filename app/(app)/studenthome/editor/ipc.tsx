@@ -1,18 +1,26 @@
+
 /*
- * Copyright (C) 2025 SchoolNest
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ MIT License
+
+Copyright (c) 2025 SchoolNest
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
  */
 import type * as q from  '@xterm/xterm';
 let dmaBufferAddress = 0;
@@ -332,22 +340,28 @@ function b(data: Uint8Array){
         emulator.bus.send(getWriteTo(0), new TextEncoder().encode(`kill -${signalNum} ${num}\n`));
     }
     emulator.add_listener(getReadFrom(1), b)
-    emulator.add_listener(getReadFrom(2), function ref(dat: Uint8Array){
-        console.log(new TextDecoder().decode(dat));
+    emulator.add_listener(getReadFrom(2), async function ref(dat: Uint8Array){
+        let inpdd = new TextDecoder().decode(dat);
+        
         console.log(dat.length);
         if (!resolvedPid) {
             pid.setResolvedValue(parseInt(new TextDecoder().decode(dat)));
             resolvedPid = true;     
             return;
+        }        let n = await pid;
+        let [pidc, exitCode] = inpdd.split(' ');
+        console.log(parseInt(pidc) );   
+        if (parseInt(pidc) != n) {
+            return;
         }
-        console.log("finished program with exit code "+ parseInt(new TextDecoder().decode(dat)));
+        console.log("finished program with exit code "+ parseInt(exitCode));
         emulator.remove_listener(getReadFrom(1), b);
         emulator.remove_listener(getReadFrom(2), ref);
-        resPromise.setResolvedValue(parseInt(new TextDecoder().decode(dat)));
+        resPromise.setResolvedValue(parseInt(exitCode));
     })
     console.log("( " + cmd + " 1>/dev/hvc1 0</dev/hvc1 2>/dev/hvc1 & echo -ne $! > /dev/hvc2; wait $!; echo -ne $? > /dev/hvc2 ) &\n ");
     
-    emulator.bus.send(getWriteTo(0), new TextEncoder().encode("( " + cmd + " 1>/dev/hvc1 0</dev/hvc1 2>/dev/hvc1 & echo -ne $! > /dev/hvc2; wait $!; echo -ne $? > /dev/hvc2 ) &\n "));
+    emulator.bus.send(getWriteTo(0), new TextEncoder().encode("( " + cmd + " 1>/dev/hvc1 0</dev/hvc1 2>/dev/hvc1 & echo -ne $! > /dev/hvc2; wait $!; echo -ne \"$! $?\" > /dev/hvc2 ) &\n "));
     
     
     return {

@@ -1,18 +1,26 @@
+
 /*
- * Copyright (C) 2025 SchoolNest
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ MIT License
+
+Copyright (c) 2025 SchoolNest
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
  */
 import { Monaco } from '@monaco-editor/react';
 import { editor } from 'monaco-editor';
@@ -163,79 +171,79 @@ function XTermComponent({ evtTarget, onEmEnableOverride }: { onEmEnableOverride?
 
   );
 }
-let NewTermComp = React.memo(({onEmEnableOverride}: {onEmEnableOverride?: EnabledOverride})=>{
+let NewTermComp = React.memo(({ onEmEnableOverride }: { onEmEnableOverride?: EnabledOverride }) => {
   return (
     <XTermComponent evtTarget={evtTarget} onEmEnableOverride={onEmEnableOverride}></XTermComponent>
   )
 })
-async function RunDefaultRunConfigurationForFile(pa: (md: PanelDefinition) => void, killCallback: (killCb: (signal: number)=>Promise<void>)=>void, emulator: any, editorContext: EditorContextType) {
+async function RunDefaultRunConfigurationForFile(pa: (md: PanelDefinition) => void, killCallback: (killCb: (signal: number) => Promise<void>) => void, emulator: any, editorContext: EditorContextType) {
   if (!editorContext.path) {
     await showPrompt('Select a file and then try running the file again', false, false);
     return;
   }
-  return new Promise<void>(async (resolve)=>{
-  let mt = mimeType.lookup(editorContext.path);
-      let rPath = '/mnt' + editorContext.path;
+  return new Promise<void>(async (resolve) => {
+    let mt = mimeType.lookup(editorContext.path);
+    let rPath = '/mnt' + editorContext.path;
 
-  if (mt) {
-    if (mt === "text/x-java-source") {
-      // found java file.
-      console.log("RUnning file at " + rPath);
-      
-      let o: EnabledOverride = async (e, t)=>{
-              let cmd = "j17_optimized " + rPath + "";
-        t.writeln("\x1b[1;34m> " + cmd + "\x1b[0m");
-let process = MessageLoop.run_program(emulator,cmd, async (dat) => {
-        console.log(dat);
-      }, (data) => {
-        console.error(data);
+    if (mt) {
+      if (mt === "text/x-java-source") {
+        // found java file.
+        console.log("RUnning file at " + rPath);
 
-      });
-      let classpath = path.basename(rPath);
-      let className = classpath.split('.')[0];
-      await process.wait();
-      
-      let dname = path.dirname(rPath);
-      cmd ="j17 java -cp " + JSON.stringify(dname) + " " + className + "";
-        t.writeln("\x1b[1;34m> " +cmd+"\x1b[0m");
+        let o: EnabledOverride = async (e, t) => {
+          let cmd = "j17_optimized " + rPath + "";
+          t.writeln("\x1b[1;34m> " + cmd + "\x1b[0m");
+          let process = MessageLoop.run_program(emulator, cmd, async (dat) => {
+            console.log(dat);
+          }, (data) => {
+            console.error(data);
 
-      let process2 = MessageLoop.run_program(emulator, cmd, (dat) => {
-        t.write(dat);
-      }, (data) => {
-        console.error(data);
+          });
+          let classpath = path.basename(rPath);
+          let className = classpath.split('.')[0];
+          await process.wait();
 
-      }); 
-      killCallback(async function (signal: number) {
-        process2.kill(signal)
-      })
-      let writeEnabled = true;
-      t.onData((arg)=>{
-        if (writeEnabled) {
-          console.log(arg.charCodeAt(0));
-        process2.input(arg);
+          let dname = path.dirname(rPath);
+          cmd = "j17 java -cp " + JSON.stringify(dname) + " " + className + "";
+          t.writeln("\x1b[1;34m> " + cmd + "\x1b[0m");
+
+          let process2 = MessageLoop.run_program(emulator, cmd, (dat) => {
+            t.write(dat);
+          }, (data) => {
+            console.error(data);
+
+          });
+          killCallback(async function (signal: number) {
+            process2.kill(signal)
+          })
+          let writeEnabled = true;
+          t.onData((arg) => {
+            if (writeEnabled) {
+              console.log(arg.charCodeAt(0));
+              process2.input(arg);
+            }
+          })
+
+          await process2.wait();
+          writeEnabled = false;
+
+          resolve();
         }
-      })
-      
-      await process2.wait();
-      writeEnabled = false;
-
-      resolve();
+        let SS = <NewTermComp onEmEnableOverride={o}></NewTermComp>
+        pa({
+          label: crypto.randomUUID(),
+          content: SS,
+          makeActive: true
+        });
+        return;
       }
-      let SS = <NewTermComp onEmEnableOverride={o}></NewTermComp>
-      pa({
-        label: crypto.randomUUID(),
-        content: SS,
-        makeActive: true
-      });
+      if (editorContext.path.endsWith("py")) {
+        let cmd = "python3 " + rPath;
+        MessageLoop.run_program
+      }
+      await showPrompt("Could not find a default run configuration for this file.");
       return;
     }
-    if (editorContext.path.endsWith("py")) {
-      let cmd = "python3 " + rPath;
-      MessageLoop.run_program
-    }
-    await showPrompt("Could not find a default run configuration for this file.");
-    return;
-  }
   });
 }
 function Runbar({ panelRef }: { panelRef: React.MutableRefObject<(md: PanelDefinition) => void> }) {
@@ -246,49 +254,51 @@ function Runbar({ panelRef }: { panelRef: React.MutableRefObject<(md: PanelDefin
     await MessageLoop.ready;
     return em;
   })());
-    let [running, setRuning] =React.useState(((<>
+  let [running, setRuning] = React.useState(((<>
     <div>Run</div><PlayIcon className={"pl-[4pt]"}></PlayIcon>
-    </>
-  ))); 
+  </>
+  )));
 
   let edCtx = useEditorContext();
 
-  
-    let [enabled, setEnabled] = React.useState(true);
-    let [color, setColor] = React.useState('success');
-  
+
+  let [enabled, setEnabled] = React.useState(true);
+  let [color, setColor] = React.useState('success');
+
   let em = data.emulator;
   function OnRun() {
-    
+
     setEnabled(false);
-    RunDefaultRunConfigurationForFile(panelRef.current,(killCB)=>{
-      
-      setRuning((<>
-            <div>Stop</div><SquareIcon className="pl-[4pt]"></SquareIcon></>
+    RunDefaultRunConfigurationForFile(panelRef.current, (killCB) => {
+      console.log("what the u")
+      setTimeout(() => {
+        setRuning((<>
+          <div>Stop</div><SquareIcon className="pl-[4pt]"></SquareIcon></>
 
-      ))
-      setEnabled(true);
-      setColor("default");
-      setHandler(()=>function () {
-        
-        killCB(9).then(()=>{
-          
-     
+        ))
+        setEnabled(true);
+        setColor("default");
+        setHandler(() => function () {
 
+          killCB(9);
         });
-      });
-    }, em, edCtx).then(()=>{
-      console.log("fins")
-      setRuning(((<>
-    <div>Run</div><PlayIcon className={"pl-[4pt]"}></PlayIcon>
-    </>
-  )));
-      setEnabled(true);
-      setColor("success");
-      setHandler(()=>OnRun);
+      })
+    }, em, edCtx).then(() => {
+      console.log("finsdddd")
+
+      setTimeout(() => {
+        setHandler(() => OnRun);
+        setRuning(((<>
+          <div>Run</div><PlayIcon className={"pl-[4pt]"}></PlayIcon>
+        </>
+        )));
+        setEnabled(true);
+        setColor("success");
+      })
+      console.log("savedall the elements")
     });
   }
-      let [onClick, setHandler] = React.useState(()=>OnRun);
+  let [onClick, setHandler] = React.useState(() => OnRun);
 
   return (
     <Button color={color as any} size="sm" className={'w-fit'} onPress={onClick} isDisabled={!enabled}>

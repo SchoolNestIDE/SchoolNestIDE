@@ -12,6 +12,8 @@
     @apply bg-background text-foreground;
   }
 }
+
+
 :root {
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;
@@ -54,6 +56,15 @@ body {
 
 
 @layer base {
+  .no-scrollbar2::-webkit-scrollbar {
+    display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar2 {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
   :root {
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
