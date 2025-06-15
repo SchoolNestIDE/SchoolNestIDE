@@ -1,3 +1,20 @@
+
+/*
+ * Copyright (C) 2025 SchoolNest
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 "use client";
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { MemoryContextType, useMemoryContext } from './filesystem';
@@ -6,7 +23,9 @@ import { useEmulatorCtx } from './emulator';
 import { GitPanel } from './git';
 import { IconArrowDown, IconArrowRight } from '@tabler/icons-react';
 import { fstat } from 'fs';
-import { FileIcon } from 'lucide-react';
+import { FileIcon, PlusIcon } from 'lucide-react';
+import { Button } from '@nextui-org/react';
+import { PressEvent } from '@react-types/shared';
 
 const S_IRWXUGO = 0x1FF;
 const S_IFMT = 0xF000;
@@ -45,7 +64,14 @@ interface FileSystemTree {
 }
 
 let evtTarget = new EventTarget();
-let selectedPath = null;
+interface CustomEventRename {
+
+}
+let selectedInode = {
+  path: "",
+  inoNum: 0
+};
+
 function FileSystemNode({ path, padding, visibility, root, directory }: {
   path: string
   padding: number,
@@ -159,6 +185,8 @@ function FileSystemNode({ path, padding, visibility, root, directory }: {
     }
   }, [])
   async function oClick(evt: React.MouseEvent) {
+     selectedInode.path = path;
+    selectedInode.inoNum = inodeNum;
     evtTarget.dispatchEvent(new CustomEvent('selectionChanged', {
       detail: inodeNum,
       bubbles: false,
@@ -167,11 +195,13 @@ function FileSystemNode({ path, padding, visibility, root, directory }: {
     let fp = (await memContext.emulator).emulator.fs9p;
     let ino = fp.inodes[fp.SearchPath(path).id];
     if ((ino.mode & S_IFMT) === S_IFDIR) {
+     
       setVisibility(!(ref.current as any as boolean)); return;
     }
     if (!editorContext) {
       return;
     }
+    
     editorContext.fs = (await memContext.emulator).emulator.fs9p;
     editorContext.path = path;
     editorContext.load();
@@ -268,10 +298,21 @@ function FileSystemRoot() {
       </h1>
     )
   };
-
+  function OnAddFileClick(e: PressEvent) {
+    let inoN = selectedInode.inoNum;
+    let p = selectedInode.path;
+    
+  }
   return (
     <>
+      <div className={'flex-grow overflow-scroll'}>
       {st}
+      </div>
+      <div className={"justify-self-end flex-shrink flex flex-col gap-5 mx-5"}>
+        <Button onPress={OnAddFileClick}>Add file<PlusIcon></PlusIcon></Button>
+        <Button></Button>
+        <Button></Button>
+      </div>
     </>
   )
 }
@@ -294,11 +335,13 @@ export
 
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", minWidth: "20%", fontSize: "18px", color: "white" }} className={"bg-muted/30"} id="cmenurelev">
-      <div style={{ position: 'relative', overflow: "auto" }} className={"bg-muted/30"}>
+    <div style={{ display: "flex", flexDirection: "column", minWidth: "20%", fontSize: "18px", color: "white", width:"100%"}} className={"bg-muted/30"} id="cmenurelev">
+      <div style={{ display: "flex", position: 'relative', overflow: "auto", width: "100%" }} className={"bg-muted/30"}>
         <FileSystemRoot></FileSystemRoot>
+                      <div className="self-end">Test</div>
+
       </div>
-      
+
     </div>
   )
 }

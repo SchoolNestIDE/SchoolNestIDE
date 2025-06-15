@@ -1,3 +1,19 @@
+/*
+ * Copyright (C) 2025 SchoolNest
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 import type * as q from  '@xterm/xterm';
 let dmaBufferAddress = 0;
 interface Connection {
@@ -116,7 +132,7 @@ class MessageLoop {
     static _instance: MessageLoop;
     static ready: ExtendedPromise<void> = NewResolvablePromise<void>();
     static add_data_listener: ()=>void;
-    static run_program: (emulator: any, cmd: string, outputStd:(data: string)=>void, outputErr: (data:string)=>void)=>{input: (data: string)=>void, wait: ()=>Promise<number>}
+    static run_program: (emulator: any, cmd: string, outputStd:(data: string)=>void, outputErr: (data:string)=>void)=>{input: (data: string)=>void, wait: ()=>Promise<number>, kill: (signal: number)=>Promise<void>}
     static get instance() {
 
         this._instance ??= new MessageLoop();
@@ -299,32 +315,47 @@ MessageLoop.add_data_listener = function () {
 }
 MessageLoop.run_program =  function (emulator, cmd, output, outputErr) {
     let resPromise = NewResolvablePromise<number>();
+    let pid = NewResolvablePromise<number>();
+    let resolvedPid = false;
     function handleInput(data: string) {
         emulator.bus.send(getWriteTo(1), new TextEncoder().encode(data));
         
     }
+    
 function b(data: Uint8Array){
         output(new TextDecoder().decode(data));
         
     }
-    
+    async function kill(signalNum: number) {
+        let num = await pid;
+        console.log(`kill -${signalNum} ${num}\n`);
+        emulator.bus.send(getWriteTo(0), new TextEncoder().encode(`kill -${signalNum} ${num}\n`));
+    }
     emulator.add_listener(getReadFrom(1), b)
     emulator.add_listener(getReadFrom(2), function ref(dat: Uint8Array){
+        console.log(new TextDecoder().decode(dat));
+        console.log(dat.length);
+        if (!resolvedPid) {
+            pid.setResolvedValue(parseInt(new TextDecoder().decode(dat)));
+            resolvedPid = true;     
+            return;
+        }
         console.log("finished program with exit code "+ parseInt(new TextDecoder().decode(dat)));
         emulator.remove_listener(getReadFrom(1), b);
         emulator.remove_listener(getReadFrom(2), ref);
         resPromise.setResolvedValue(parseInt(new TextDecoder().decode(dat)));
     })
+    console.log("( " + cmd + " 1>/dev/hvc1 0</dev/hvc1 2>/dev/hvc1 & echo -ne $! > /dev/hvc2; wait $!; echo -ne $? > /dev/hvc2 ) &\n ");
     
-    emulator.bus.send(getWriteTo(0), new TextEncoder().encode(cmd + " 1>/dev/hvc1 0</dev/hvc1; echo $? > /dev/hvc2\n"));
+    emulator.bus.send(getWriteTo(0), new TextEncoder().encode("( " + cmd + " 1>/dev/hvc1 0</dev/hvc1 2>/dev/hvc1 & echo -ne $! > /dev/hvc2; wait $!; echo -ne $? > /dev/hvc2 ) &\n "));
     
-        
-
-return {
+    
+    return {
     input: handleInput,
     wait() {
         return resPromise;
-    }
+    },
+    kill: kill
 }
 }
 MessageLoop.virtio_console_bus = function (emulator: any) {

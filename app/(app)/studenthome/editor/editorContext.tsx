@@ -1,3 +1,19 @@
+/*
+ * Copyright (C) 2025 SchoolNest
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 import { Monaco } from '@monaco-editor/react';
 import { editor } from 'monaco-editor';
 import dynamic from 'next/dynamic';
@@ -9,7 +25,7 @@ import localforage from 'localforage';
 import { StorageType } from '../storage_config';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { ActionBar, ActionBarItem } from './actionBar';
-import { FilesIcon, GitBranchIcon, HelpCircleIcon, PlayIcon } from 'lucide-react';
+import { FilesIcon, GitBranchIcon, HelpCircleIcon, PlayIcon, SquareIcon } from 'lucide-react';
 import { GitPanel } from './git';
 import JavaBeginnerGuide from './HelpPanel';
 import { MessageLoop } from './ipc';
@@ -152,23 +168,23 @@ let NewTermComp = React.memo(({onEmEnableOverride}: {onEmEnableOverride?: Enable
     <XTermComponent evtTarget={evtTarget} onEmEnableOverride={onEmEnableOverride}></XTermComponent>
   )
 })
-async function RunDefaultRunConfigurationForFile(pa: (md: PanelDefinition) => void, emulator: any, editorContext: EditorContextType) {
+async function RunDefaultRunConfigurationForFile(pa: (md: PanelDefinition) => void, killCallback: (killCb: (signal: number)=>Promise<void>)=>void, emulator: any, editorContext: EditorContextType) {
   if (!editorContext.path) {
     await showPrompt('Select a file and then try running the file again', false, false);
     return;
   }
-  return new Promise<void>((resolve)=>{
+  return new Promise<void>(async (resolve)=>{
   let mt = mimeType.lookup(editorContext.path);
+      let rPath = '/mnt' + editorContext.path;
 
   if (mt) {
     if (mt === "text/x-java-source") {
       // found java file.
-      let rPath = '/mnt' + editorContext.path;
       console.log("RUnning file at " + rPath);
       
       let o: EnabledOverride = async (e, t)=>{
-              let cmd = "j17_optimized " + rPath;
-        t.writeln(cmd);
+              let cmd = "j17_optimized " + rPath + "";
+        t.writeln("\x1b[1;34m> " + cmd + "\x1b[0m");
 let process = MessageLoop.run_program(emulator,cmd, async (dat) => {
         console.log(dat);
       }, (data) => {
@@ -177,19 +193,32 @@ let process = MessageLoop.run_program(emulator,cmd, async (dat) => {
       });
       let classpath = path.basename(rPath);
       let className = classpath.split('.')[0];
-
-      let err = await process.wait();
+      await process.wait();
+      
       let dname = path.dirname(rPath);
-      cmd ="j17 java -cp " + JSON.stringify(dname) + " " + className;
-        t.writeln(cmd);
+      cmd ="j17 java -cp " + JSON.stringify(dname) + " " + className + "";
+        t.writeln("\x1b[1;34m> " +cmd+"\x1b[0m");
 
       let process2 = MessageLoop.run_program(emulator, cmd, (dat) => {
         t.write(dat);
       }, (data) => {
         console.error(data);
 
-      });
+      }); 
+      killCallback(async function (signal: number) {
+        process2.kill(signal)
+      })
+      let writeEnabled = true;
+      t.onData((arg)=>{
+        if (writeEnabled) {
+          console.log(arg.charCodeAt(0));
+        process2.input(arg);
+        }
+      })
+      
       await process2.wait();
+      writeEnabled = false;
+
       resolve();
       }
       let SS = <NewTermComp onEmEnableOverride={o}></NewTermComp>
@@ -198,31 +227,72 @@ let process = MessageLoop.run_program(emulator,cmd, async (dat) => {
         content: SS,
         makeActive: true
       });
-      console.log('success');
+      return;
     }
+    if (editorContext.path.endsWith("py")) {
+      let cmd = "python3 " + rPath;
+      MessageLoop.run_program
+    }
+    await showPrompt("Could not find a default run configuration for this file.");
+    return;
   }
   });
 }
 function Runbar({ panelRef }: { panelRef: React.MutableRefObject<(md: PanelDefinition) => void> }) {
   let ectx = useEmulatorCtx();
-  let edCtx = useEditorContext();
-    let [enabled, setEnabled] = React.useState(false);
 
   let data = React.use((async () => {
     let em = await ectx.emulator;
     await MessageLoop.ready;
     return em;
   })());
+    let [running, setRuning] =React.useState(((<>
+    <div>Run</div><PlayIcon className={"pl-[4pt]"}></PlayIcon>
+    </>
+  ))); 
+
+  let edCtx = useEditorContext();
+
+  
+    let [enabled, setEnabled] = React.useState(true);
+    let [color, setColor] = React.useState('success');
+  
   let em = data.emulator;
   function OnRun() {
+    
     setEnabled(false);
-    RunDefaultRunConfigurationForFile(panelRef.current, em, edCtx).then(()=>{
+    RunDefaultRunConfigurationForFile(panelRef.current,(killCB)=>{
+      
+      setRuning((<>
+            <div>Stop</div><SquareIcon className="pl-[4pt]"></SquareIcon></>
+
+      ))
       setEnabled(true);
+      setColor("default");
+      setHandler(()=>function () {
+        
+        killCB(9).then(()=>{
+          
+     
+
+        });
+      });
+    }, em, edCtx).then(()=>{
+      console.log("fins")
+      setRuning(((<>
+    <div>Run</div><PlayIcon className={"pl-[4pt]"}></PlayIcon>
+    </>
+  )));
+      setEnabled(true);
+      setColor("success");
+      setHandler(()=>OnRun);
     });
   }
+      let [onClick, setHandler] = React.useState(()=>OnRun);
+
   return (
-    <Button color="success" size="sm" className={'w-fit'} onPress={OnRun} disabled>
-      <div>Run</div><PlayIcon className={"pl-[4pt]"}></PlayIcon>
+    <Button color={color as any} size="sm" className={'w-fit'} onPress={onClick} isDisabled={!enabled}>
+      {running}
     </Button>
   )
 }
