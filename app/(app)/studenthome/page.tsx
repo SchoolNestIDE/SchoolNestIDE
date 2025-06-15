@@ -295,19 +295,79 @@ export default function Page() {
             return <a style={{ padding: "12px" }} onClick={IntegrateGithub.bind(null, project.projectName)} href="javascript:">{icons['github']} Integrate Github</a>;
         }
 
+        let sortedProjectList: Project[] = projectList?.sort((a: Project, b: Project) => {
+            if (a.projectType === b.projectType) {
+                return a.projectName > b.projectName ? 1 : -1;
+            }
+            return a.projectType > b.projectType ? 1 : -1;
+        })
+
+        let foundCpp = false;
+        let foundJava = false;
+        let foundLinux = false;
+        let foundPython = false;
+
         return (
             <div className="my-auto h-full">
                 <button className="border rounded-md px-4 py-2 mt-1 mb-5 text-black dark:text-white bg-neutral-300 dark:bg-neutral-800" onClick={createProject}>Create New Project</button>
 
-                <div className="flex flex-col space-y-1 max-h-[50dvh] overflow-y-scroll">
+                <div className="flex flex-col space-y-1 max-h-[50dvh] overflow-y-scroll gap-y-4">
 
-                    {projectList?.map((project) => {
+                    {sortedProjectList?.map((project) => {
                         return (
                             <>
-                                {/* <a className="text-black dark:text-white" key={project} href="/">{project}</a> */}
-
-                                <Link style={{ padding: "12px", border: "2px solid white" }} onClick={()=>{sessionStorage['projectname'] = project.projectName; sessionStorage['langtype'] = project.projectType}}className="text-black dark:text-white" href={`/studenthome/editor`} >
-                                    {project.projectName}<div style={{ padding: "6pt" }}>{icons[project.projectType]}</div><GithubIntegrationButton project={project}></GithubIntegrationButton>
+                                {/* sneaky iife*/}
+                                {(() => {
+                                    if (!foundCpp && project.projectType === "cpp") {
+                                        foundCpp = true;
+                                        return <>
+                                            <h1>C++</h1>
+                                            <hr />
+                                        </>
+                                    }
+                                })()}
+                                {(() => {
+                                    if (!foundJava && project.projectType === "java") {
+                                        foundJava = true;
+                                        return <>
+                                            <h1>Java</h1>
+                                            <hr />
+                                        </>
+                                    }
+                                })()}
+                                {(() => {
+                                    if (!foundLinux && project.projectType === "linux") {
+                                        foundLinux = true;
+                                        return <>
+                                            <h1>Linux</h1>
+                                            <hr />
+                                        </>
+                                    }
+                                })()}
+                                {(() => {
+                                    if (!foundPython && project.projectType === "python") {
+                                        foundPython = true;
+                                        return <>
+                                            <h1>Python</h1>
+                                            <hr />
+                                        </>
+                                    }
+                                })()}
+                                <Link 
+                                    className="text-black dark:text-white p-[12px] border-2 border-solid border-white rounded-xl mx-2"
+                                    onClick={()=>{
+                                        sessionStorage['projectname'] = project.projectName;
+                                        sessionStorage['langtype'] = project.projectType
+                                    }}
+                                    href={`/studenthome/editor`}
+                                >
+                                    <div className="w-[75%] flex flex-row gap-4">
+                                        {icons[project.projectType]}
+                                        {project.projectName}
+                                    </div>
+                                    <div className="flex flex-row w-[25%]">
+                                        <GithubIntegrationButton project={project}></GithubIntegrationButton>
+                                    </div>
                                 </Link>
 
                             </>
@@ -437,7 +497,7 @@ export default function Page() {
                 </AdvancedSettingsLink>
             ),
             header: <AllProjects />,
-            className: "mt-10 w-auto h-[clamp(40dvh, auto, 90dvh)] md:col-span-2",
+            className: "mt-[110px] w-auto h-[80%] md:col-span-2",
             icon: <IconClipboardCopy className="h-4 w-4 text-neutral-500" />,
         },
 
