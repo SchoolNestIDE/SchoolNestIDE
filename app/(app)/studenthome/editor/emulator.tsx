@@ -34,12 +34,18 @@ import { showPrompt } from './prompt';
 import RenderModalDialog from './modal_dialog';
 import { DownloadProgressBar } from './progressbar';
 import { useModalDialogCtx } from './ModalDialog';
+
 let baseURI = ''
 async function downloadV86() {
 
   //@ts-ignore
   let mod = await import(/* webpackIgnore: true */ `${location.origin}/libv86.mjs`);
   return mod;
+}
+async function downloadLibCurl() {
+  //@ts-ignore
+        let {libcurl} = await import(/* webpackIgnore: true */'https://cdn.jsdelivr.net/npm/libcurl.js@0.7.1/libcurl_full.mjs');
+  return libcurl;
 }
 interface EmulatorContextData {
   emulator: any,
@@ -135,7 +141,7 @@ class EmulatorContextCls {
 }
 const EmulatorContext = createContext<EmulatorContextCls | null>(null);
 function EmulatorProvider({ children }: { children: React.ReactNode }) {
-  console.log("uscc")
+  // console.log("uscc")
   let c = new EmulatorContextCls()
 
   let EmulatorRef = useRef<EmulatorContextData | null>(null);
@@ -146,7 +152,8 @@ function EmulatorProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     (async () => {
-
+      let l = await downloadLibCurl();
+      console.log(l);
       console.log("set emulator");
       if (!memContext) return;
       localStorage.openpages = Date.now();
@@ -227,7 +234,7 @@ function EmulatorProvider({ children }: { children: React.ReactNode }) {
         wasm_path: "/v86.wasm",
         net_device: {
           "type": "virtio",
-          "relay_url": "fetch"
+          "relay_url": "wisps://wisp-server-workers.avadhutumahamuni.workers.dev/"
         },
         bios: {
           url: "/seabios.bin",

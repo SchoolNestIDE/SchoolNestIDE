@@ -23,7 +23,7 @@ import { FloatingNav } from "@/app/components/ui/floating-navbar";
 import React, { use, useRef } from "react";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Button, Dropdown, DropdownItem, Input, Link, Select, SelectItem } from "@nextui-org/react";
+import { Button, Dropdown, DropdownItem, Input, Link, Select, SelectItem, SharedSelection } from "@nextui-org/react";
 import Prompt, { showPrompt } from "./editor/prompt";
 import Image from "next/image";
 import { StorageType, Project } from "./storage_config";
@@ -32,6 +32,7 @@ import Nossr from "./editor/nossr";
 import RenderModalDialog from "./editor/modal_dialog";
 import { getOrCreateGithubToken } from "./editor/git";
 import { IndexedDBProvider, useIDB } from "./editor/indexeddb";
+import { TriangleAlert } from "lucide-react";
 function AdvancedSettings({ style }: { style?: React.CSSProperties }) {
     return (
         <>
@@ -236,59 +237,80 @@ export default function Page() {
                 <IconBrandGit></IconBrandGit>
             )
         }
+        function GithubIntegrationEditor({ project, ghToken, onComplete}: { onComplete: ()=>void, ghToken: string, project: Project }) {
+            let [branches,setBranches] = useState([] as string[]);
+            let [branchSelectionDisabled,setBsDisabled] = useState(true);
+            let [submitButtonDisabled, setSubBtnDisabled] = useState(false);
+            async function onRepoLinkChanged(e: React.ChangeEvent<HTMLInputElement>) {
+                let theVal = e.currentTarget.value;
+                console.log(theVal);
+
+                let  url:URL;
+                try {
+                    url = new URL(theVal);
+                } catch {
+                    return;
+                }
+                if (!url.hostname.includes("github.com")) {
+                    // showPrompt("Please re-link this with a valid github URL");
+                    return;
+                }
+                if (url.pathname.split('/').length < 3) {
+                    // showPrompt("Please re-link this with a valid github URL, Include the repository name");
+                    return;
+                }
+                console.log(url);
+                console.log(url.pathname.split('/'));
+
+                let [organizationName, repoName] = url.pathname.slice(1).split('/');
+                project.githubUsername = organizationName;
+                project.githubRepo = repoName;
+                let r = await githubApiRequest(ghToken as string, "GET", `/repos/${project.githubUsername}/${project.githubRepo}/branches`)
+                if (!r.map) {
+                    return;
+                }
+                setBranches(r.map(v=>v.name) as string[]);
+                setBsDisabled(false);
+            }
+            function OnBranchSelected(e: SharedSelection) {
+let thebranch = e.currentKey;
+project.githubBranch = thebranch;
+                setSubBtnDisabled(false);
+            }
+            return (
+                <div className="flex flex-col">
+                    Github Repo Link: <div><Input type="text" onChange={onRepoLinkChanged} defaultValue={`https://github.com/${project.githubUsername}/${project.githubRepo}`}></Input></div>
+                    Github Branches: <Select isDisabled={branchSelectionDisabled} onSelectionChange={OnBranchSelected} defaultSelectedKeys={project.githubBranch}>{
+                        branches.map(v=>{
+                            return <SelectItem key={v}>{v}</SelectItem>;
+                        })
+                        }</Select>
+                    <Button isDisabled={submitButtonDisabled} onPress={onComplete}></Button>
+                </div>
+            )
+        }
         function GithubIntegrationButton({ project }: { project: Project }) {
             let ct = useIDB();
+                            let ModalDialogCtx = useModalDialogCtx();
+
             async function IntegrateGithub(projectName: string, e: React.MouseEvent) {
                 if (!ct) {
                     showPrompt("Please wait for the IDB provider to be available", false);
                     return;
                 }
-                let inputValue = await showPrompt((
-                    <div>Enter github repo link for {projectName}</div>
-                )) as string;
-                let url = null;
-                try {
-                    url = new URL(inputValue);
-                } catch {
-                    showPrompt("Please re-link this with a valid github URL");
-                    return;
-                }
-                if (!url.hostname.includes("github.com")) {
-                    showPrompt("Please re-link this with a valid github URL");
-                    return;
-                }
-                if (url.pathname.split('/').length < 2) {
-                    showPrompt("Please re-link this with a valid github URL, Include the repository name");
-                    return;
-                }
-                console.log(url.pathname.split('/'));
-                let [organizationName, repoName] = url.pathname.slice(1).split('/');
 
-                let githubInfo = {
-                    githubUsername: organizationName,
-                    githubRepo: repoName
-                };
-                let s: StorageType | null = await localForage.getItem('projectList');
-                if (!s) {
-                    return;
-                }
+                let ghT = await getOrCreateGithubToken(await ct.ensureDB());
+               
+                ModalDialogCtx.setModalContents((
+                    <GithubIntegrationEditor ghToken={ghT} project={project} onComplete={()=>{
+                        ModalDialogCtx.setModalContents(null);
+                        ModalDialogCtx.setModalVisibility(false);
+                    }}></GithubIntegrationEditor>
+                ));
+ModalDialogCtx.setModalVisibility(true);
 
-                let theProject = s.projects.filter(v => v.projectName === projectName)[0];
-                Object.assign(theProject, githubInfo);
-                let selectedBranch = "";
 
-                await showPrompt((
-                    <GitBranchDropdown project={theProject} ghToken={await getOrCreateGithubToken(await ct.ensureDB()) as string} selectionChanged={v => { selectedBranch = v; console.log(v); }}></GitBranchDropdown>
-                ), true);
-                theProject.githubBranch = selectedBranch;
-
-                await localForage.setItem("projectList", s);
-
-                showPrompt((
-                    <div>
-                        Successfully enabled github integration with {project.projectName} for https://github.com/{project.githubUsername}/{project.githubRepo}
-                    </div>
-                ), true);
+                
                 e.preventDefault();
                 return;
             }
@@ -306,7 +328,7 @@ export default function Page() {
                             <>
                                 {/* <a className="text-black dark:text-white" key={project} href="/">{project}</a> */}
 
-                                <Link style={{ padding: "12px", border: "2px solid white" }} onClick={()=>{sessionStorage['projectname'] = project.projectName; sessionStorage['langtype'] = project.projectType}}className="text-black dark:text-white" href={`/studenthome/editor`} >
+                                <Link style={{ padding: "12px", border: "2px solid white" }} onClick={() => { sessionStorage['projectname'] = project.projectName; sessionStorage['langtype'] = project.projectType }} className="text-black dark:text-white" href={`/studenthome/editor`} >
                                     {project.projectName}<div style={{ padding: "6pt" }}>{icons[project.projectType]}</div><GithubIntegrationButton project={project}></GithubIntegrationButton>
                                 </Link>
 
@@ -336,7 +358,7 @@ export default function Page() {
     function AdvancedSettingsContent() {
         let mdc = useModalDialogCtx();
         let idb = useIDB();
-        const [percentageDownload, setPercentageDownload] = useState<null|string>(null);
+        const [percentageDownload, setPercentageDownload] = useState<null | string>(null);
         console.log(idb);
         async function onBackToSafety() {
 
@@ -393,7 +415,7 @@ export default function Page() {
                     //value is null
                     break;
                 }
-                setPercentageDownload(((off/qs.byteLength)*100).toFixed(2));
+                setPercentageDownload(((off / qs.byteLength) * 100).toFixed(2));
                 ua.set(ch.value, off);
                 off += ch.value.length;
             }
@@ -450,10 +472,10 @@ export default function Page() {
                 <IndexedDBProvider>
                     <ModalDialogProvider>
                         <RenderModalDialog>
-                            
+
                         </RenderModalDialog>
                         <FloatingNav />
-                        
+
 
                         <BentoGrid className="flex flex-col justify-center w-[100dvw] h-[100dvh]">
                             {items.map((item, i) => (

@@ -155,7 +155,7 @@ async function getOrCreateGithubToken(db: IDBDatabase) {
   let usrSecret = transaction.objectStore('user-secrets');
   let ghToken = usrSecret.get("/github-token");
   console.log("hi");
-  return new Promise(async (res, rej)=>{
+  return new Promise<string>(async (res, rej)=>{
     ghToken.onsuccess  = async (ev)=>{
       if (!ghToken.result) {
         let token =await  retreiveToken();

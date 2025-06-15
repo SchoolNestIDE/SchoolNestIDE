@@ -297,7 +297,22 @@ function Editor({ panelRef }: { panelRef: React.MutableRefObject<(newPanel: Pane
   function dispatchResize() {
     evtTarget.dispatchEvent(new Event('resize'));
   }
+function setLightDarkTheme(a: editor.IStandaloneCodeEditor) {
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      ec.monaco.editor.setTheme('vs-dark')
+    }else {
+            ec.monaco.editor.setTheme('vs-light');
 
+    }
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',(ev)=>{
+      if (ev.matches) {
+      ec.monaco.editor.setTheme('vs-dark');
+    }else {
+            ec.monaco.editor.setTheme('vs-light');
+
+    }
+    })
+  }
   return (
     <>
 
@@ -316,10 +331,11 @@ function Editor({ panelRef }: { panelRef: React.MutableRefObject<(newPanel: Pane
   }
 }]} onChange={(s)=>{}}></SwitchablePanelNoContent>
             </div>
+            
             <MonacoEditor beforeMount={(mon) => {
               ec.monaco = mon
             }} onChange={ec.onChange.bind(ec)} onMount={(editor) => {
-              if (ec.monaco) { ec.monaco.editor.setTheme('vs-dark') }; ec.editor = editor; ec.editor.updateOptions({ readOnly: true }); editor.getModel().setValue("Please select a file before you edit this.")
+              if (ec.monaco) { setLightDarkTheme(editor)}; ec.editor = editor; ec.editor.updateOptions({ readOnly: true }); editor.getModel().setValue("Please select a file before you edit this.")
             }} ></MonacoEditor>
 </div>
           </ResizablePanel>
