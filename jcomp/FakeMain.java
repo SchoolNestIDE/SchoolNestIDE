@@ -23,7 +23,7 @@ public class FakeMain {
         while (true) {
         FileReader fr =new FileReader(new File("/tmp/srvStream"));
         BufferedReader br = new BufferedReader(fr);
-
+        int exitCode = 0;
         try {
             while ((line = br.readLine())!=null) {
 
@@ -34,21 +34,24 @@ public class FakeMain {
                     String toDecode = ar[i];
                     argsList.add(new String(dec.decode(toDecode), StandardCharsets.UTF_8));
                 }
-                argsList.add("-sourcepath");
-                argsList.add(pwd);
 
-                com.sun.tools.javac.Main.compile(argsList.toArray(new String[0]));
-                
+                String outputPath = pwd;
+                PrintWriter pw = new PrintWriter(outputPath);
+                exitCode = com.sun.tools.javac.Main.compile(argsList.toArray(new String[0]),pw);
+                pw.close();
 
             }
                            fr.close();
 
+        PrintWriter fw = new PrintWriter(new File("/tmp/srvStream"));
+        fw.println(exitCode);
+        fw.close();
             
 
         } catch (IOException e) {
-            System.err.println("Faced an IO Exception here");
+            System.err.println("Faced an IO Exception here: " );
+            e.printStackTrace();
         }
-        new FileWriter(new File("/tmp/srvStream")).close();
 
         }
     }

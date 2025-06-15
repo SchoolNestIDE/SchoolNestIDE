@@ -42,9 +42,10 @@ import { FitAddon } from '@xterm/addon-fit';
 import { Button, ringClasses } from '@nextui-org/react';
 import { showPrompt } from './prompt';
 import path from 'path';
-import SwitchablePanel, { PanelDefinition } from './NonRerenderingPanel';
+import SwitchablePanel, { PanelDefinition, SwitchablePanelNoContent } from './NonRerenderingPanel';
 import { markCurrentScopeAsDynamic } from 'next/dist/server/app-render/dynamic-rendering';
 import { Terminal } from '@xterm/xterm';
+import { EnabledOverride, XTermComponent } from './xterm';
 const mimeType = require('mime-types');
 const ps = require('path');
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
@@ -57,10 +58,11 @@ interface EditorContextType {
   _fs: typeof import('fs') | null;
   get fs(): typeof import('fs') | null;
   set fs(fs: typeof import('fs'));
-  editor?: editor.IStandaloneCodeEditor,
-  getRepoName(projectName: string): Promise<string | null>
-  getUserName(projectName: string): Promise<string | null>
-  getBranchName(projectName: string): Promise<string | null>
+  editor?: editor.IStandaloneCodeEditor;
+  getRepoName(projectName: string): Promise<string | null>;
+  getUserName(projectName: string): Promise<string | null>;
+  getBranchName(projectName: string): Promise<string | null>;
+  fid: number;
 }
 interface EditorTab {
   path: string,
@@ -71,111 +73,13 @@ interface EditorTabProp {
   onOpen?: (editorTab: EditorTab) => void,
   onClose?: (editorTab: EditorTab) => void
 }
-type EnabledOverride = (emu: any, terminal: Terminal) => void;
-function XTermComponent({ evtTarget, onEmEnableOverride }: { onEmEnableOverride?: EnabledOverride, evtTarget: EventTarget }) {
 
-  const terminalRef = React.useRef(null);
-
-
-  const [downloadProgress, setDownloadProgressUI] = React.useState(0);
-  const [fitAddon, setFitAddon] = React.useState<FitAddon | null>(null);
-  let emuCtx = useEmulatorCtx();
-  let memoryContextSettings = useMemoryContext();
-  // debugger;
-
-  React.useEffect(() => {
-    let temr;
-    console.log(terminalRef.current);
-
-    setTimeout((async () => {
-
-      if (!terminalRef.current) {
-        // This should not happen
-        console.error("UseEffect triggered with unloaded terminal");
-        return;
-      }
-
-
-      let em = await emuCtx.emulator;
-      var fs;
-      console.log(em);
-      const xterm = await import('@xterm/xterm');
-      let fitAddon = await import("@xterm/addon-fit");
-      console.log(terminalRef);
-
-      /* eslint-disable */
-      let fadd = new fitAddon.FitAddon();
-      if (!memoryContextSettings) {
-        return;
-      }
-
-      console.log(fadd);
-      fs = memoryContextSettings.fs;
-
-
-
-      temr = new xterm.Terminal({});
-
-      temr.options.fontSize = 14;
-      temr.options.lineHeight = 1;
-      console.log(terminalRef)
-      temr.open(terminalRef.current);
-      temr.loadAddon(fadd);
-      setFitAddon(fadd);
-
-      evtTarget.addEventListener('resize', () => {
-        fadd.fit();
-      })
-      if (onEmEnableOverride) {
-        onEmEnableOverride(em, temr);
-        fadd.fit();
-        return;
-      }
-      let msgLoop = new MessageLoop();
-      em.msgLoop = msgLoop;
-      msgLoop.onEmulatorEnabled(em.emulator, temr);
-      MessageLoop.virtio_console_bus((await emuCtx.emulator).emulator);
-
-      await emuCtx.waitTillDiskIsSaved();
-      fadd.fit()
-    }));
-  }, []);
-  // debugger;
-
-
-
-
-  let placeholder = (
-    <div className={`relative flex flex-grow flex-row items-center justify-items-center`}>
-
-
-    </div>
-  )
-  function switchToEditor() {
-
-  }
-
-  const mouseState = { down: false, cb: null };
-
-  function a(am: any) {
-    if (!fitAddon) {
-      return;
-    }
-    console.log(am);
-    fitAddon.fit();
-
-  }
-
-  return (
-    <div style={{ height: "100%" }} ref={terminalRef}></div>
-
-  );
-}
-let NewTermComp = React.memo(({ onEmEnableOverride }: { onEmEnableOverride?: EnabledOverride }) => {
+let NewTermComp = React.memo(function M ({ onEmEnableOverride }: { onEmEnableOverride?: EnabledOverride }) {
   return (
     <XTermComponent evtTarget={evtTarget} onEmEnableOverride={onEmEnableOverride}></XTermComponent>
   )
-})
+});
+export {NewTermComp}
 async function RunDefaultRunConfigurationForFile(pa: (md: PanelDefinition) => void, killCallback: (killCb: (signal: number) => Promise<void>) => void, emulator: any, editorContext: EditorContextType) {
   if (!editorContext.path) {
     await showPrompt('Select a file and then try running the file again', false, false);
@@ -194,15 +98,18 @@ async function RunDefaultRunConfigurationForFile(pa: (md: PanelDefinition) => vo
           let cmd = "j17_optimized " + rPath + "";
           t.writeln("\x1b[1;34m> " + cmd + "\x1b[0m");
           let process = MessageLoop.run_program(emulator, cmd, async (dat) => {
-            console.log(dat);
+            t.write(dat);
           }, (data) => {
             console.error(data);
 
           });
           let classpath = path.basename(rPath);
           let className = classpath.split('.')[0];
-          await process.wait();
-
+          let exit = await process.wait();
+          if (exit !== 0) {
+            resolve();
+            return;
+          }
           let dname = path.dirname(rPath);
           cmd = "j17 java -cp " + JSON.stringify(dname) + " " + className + "";
           t.writeln("\x1b[1;34m> " + cmd + "\x1b[0m");
@@ -246,15 +153,8 @@ async function RunDefaultRunConfigurationForFile(pa: (md: PanelDefinition) => vo
     }
   });
 }
-function Runbar({ panelRef }: { panelRef: React.MutableRefObject<(md: PanelDefinition) => void> }) {
-  let ectx = useEmulatorCtx();
-
-  let data = React.use((async () => {
-    let em = await ectx.emulator;
-    await MessageLoop.ready;
-    return em;
-  })());
-  let [running, setRuning] = React.useState(((<>
+function Runbtn({panelRef, data}: {data: any, panelRef: React.MutableRefObject<(md: PanelDefinition) => void> }) {
+let [running, setRuning] = React.useState(((<>
     <div>Run</div><PlayIcon className={"pl-[4pt]"}></PlayIcon>
   </>
   )));
@@ -268,9 +168,10 @@ function Runbar({ panelRef }: { panelRef: React.MutableRefObject<(md: PanelDefin
   let em = data.emulator;
   function OnRun() {
 
-    setEnabled(false);
+    setTimeout(()=>{
+      setEnabled(false);
+    })
     RunDefaultRunConfigurationForFile(panelRef.current, (killCB) => {
-      console.log("what the u")
       setTimeout(() => {
         setRuning((<>
           <div>Stop</div><SquareIcon className="pl-[4pt]"></SquareIcon></>
@@ -282,7 +183,7 @@ function Runbar({ panelRef }: { panelRef: React.MutableRefObject<(md: PanelDefin
 
           killCB(9);
         });
-      })
+      },100);
     }, em, edCtx).then(() => {
       console.log("finsdddd")
 
@@ -294,17 +195,28 @@ function Runbar({ panelRef }: { panelRef: React.MutableRefObject<(md: PanelDefin
         )));
         setEnabled(true);
         setColor("success");
-      })
+      },150)
       console.log("savedall the elements")
     });
   }
   let [onClick, setHandler] = React.useState(() => OnRun);
-
-  return (
+return (
     <Button color={color as any} size="sm" className={'w-fit'} onPress={onClick} isDisabled={!enabled}>
       {running}
     </Button>
   )
+}
+function Runbar({ panelRef }: { panelRef: React.MutableRefObject<(md: PanelDefinition) => void> }) {
+  let ectx = useEmulatorCtx();
+
+  let data = React.use((async () => {
+    let em = await ectx.emulator;
+    await MessageLoop.ready;
+    return em;
+  })());
+  
+return <Runbtn panelRef={panelRef} data={data}></Runbtn>
+  
 }
 function NavBarHeader({ panelRef }: { panelRef: React.MutableRefObject<(pd: PanelDefinition) => void> }) {
   let emCtx = useEmulatorCtx();
@@ -347,12 +259,13 @@ const TabsView: React.FC<EditorTabProp> = function (props) {
   )
 }
 let evtTarget = new EventTarget();
-let Comp = React.memo(({ evtTarget }: { evtTarget: EventTarget }) => { return <XTermComponent evtTarget={evtTarget}></XTermComponent> });
+let Comp = React.memo(function M({ evtTarget }: { evtTarget: EventTarget }) { return <XTermComponent evtTarget={evtTarget}></XTermComponent> });
 function Editor({ panelRef }: { panelRef: React.MutableRefObject<(newPanel: PanelDefinition) => void> }) {
   console.log(localforage);
   let ec = React.useContext(EditorContextTypeContext);
   let [tabs, setTabs] = React.useState([] as EditorTab[]);
   let r = React.useRef(tabs);
+  let pRef2 = React.useRef(()=>{});
 
   const onTabOpen = function (ed: EditorTab) {
     if (!ec) {
@@ -385,19 +298,30 @@ function Editor({ panelRef }: { panelRef: React.MutableRefObject<(newPanel: Pane
     evtTarget.dispatchEvent(new Event('resize'));
   }
 
-
   return (
     <>
+
       <ResizablePanel className={"max-h-screen"}>
+            
         <ResizablePanelGroup direction="vertical">
 
           <ResizablePanel >
+            <div className="flex flex-col h-[100%]">
+            <div className="flex-shrink">
+<SwitchablePanelNoContent pRef={pRef2} panels={[{
+  'label': "test",
+  "makeActive": true,
+  "metadata": {
+    "test": 2
+  }
+}]} onChange={(s)=>{}}></SwitchablePanelNoContent>
+            </div>
             <MonacoEditor beforeMount={(mon) => {
               ec.monaco = mon
             }} onChange={ec.onChange.bind(ec)} onMount={(editor) => {
               if (ec.monaco) { ec.monaco.editor.setTheme('vs-dark') }; ec.editor = editor; ec.editor.updateOptions({ readOnly: true }); editor.getModel().setValue("Please select a file before you edit this.")
             }} ></MonacoEditor>
-
+</div>
           </ResizablePanel>
           <ResizableHandle style={{ height: "20px" }}  ></ResizableHandle>
           <ResizablePanel onResize={dispatchResize}>
@@ -476,6 +400,7 @@ function EditorContextProvider({ children }: { children: React.ReactNode }) {
 
     },
     path: null,
+    fid: 0,
     _fs: null,
     set fs(fs: typeof import('fs')) {
       this._fs = fs;
@@ -495,3 +420,4 @@ function useEditorContext() {
   return React.useContext(EditorContextTypeContext);
 }
 export { EditorContextProvider, Editor, useEditorContext, NavBarHeader }
+export type {EditorContextType}

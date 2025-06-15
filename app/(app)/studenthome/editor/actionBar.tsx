@@ -24,7 +24,7 @@ SOFTWARE.
  */
 import { Button, ResizablePanel } from '@nextui-org/react'
 import React, { useState } from 'react'
-type PanelType = "git" | "filetree" | "settings"|"linuxguide"
+type PanelType = "git" | "filetree" | "settings"|"linuxguide"|"runpanel"
 
 export interface ActionBarItem {
     icon: React.ReactNode;
@@ -33,6 +33,7 @@ export interface ActionBarItem {
     panel: React.FC;
     isEnabled?: EventTarget;
     className?: string
+    toTheEnd?: boolean
 }
 
 
@@ -52,15 +53,38 @@ export interface ActionBarItem {
     return (
       <div className={`flex h-[100%] border rounded-lg ${invOrientation}  bg-muted/30`}>
         {/* Left sidebar with icons */}
-        <div className={`flex flex-${orientation} border-r bg-muted/30`}>
-          {actionItems.map((item) => {
-
+        <div className={`flex flex-${orientation} border-r bg-muted/30  `}>
+          <div className={"flex flex-col flex-grow "}>
+            {actionItems.map((item) => {
+            if (item.toTheEnd) {
+              return;
+            }
             return  (<Button
               key={item.label}
               variant="ghost"
               size="sm"
               fullWidth={false}
-              style={{border: "none", borderBottom: "2px solid", borderBottomColor: "indigo"}}
+              style={{border: "none", borderBottom: "2px solid", borderBottomColor: (activePanel===item.label)?"rgb(111,0,254)":"indigo", paddingLeft: "0px", paddingRight:"0px", minWidth: "", height: "4rem", borderRadius: "0px"}}
+              className={" "}
+              disableRipple={true}
+              onClick={() => setActivePanel(item.label)}
+            >
+              {item.icon}
+              <span className="sr-only">{item.name}</span>
+            </Button>)
+          })}
+          </div>
+          <div className={"flex flex-col flex-shrink"}>
+            {actionItems.map((item) => {
+            if (!item.toTheEnd) {
+              return;
+            }
+            return  (<Button
+              key={item.label}
+              variant="ghost"
+              size="sm"
+              fullWidth={false}
+              style={{border: "none", borderBottom: "2px solid", borderBottomColor: "indigo", height:"4rem"}}
               className={" "}
               onClick={() => setActivePanel(item.label)}
             >
@@ -68,19 +92,24 @@ export interface ActionBarItem {
               <span className="sr-only">{item.name}</span>
             </Button>)
           })}
+          </div>
         </div>
   
         {/* Right panel area */}
-        <div className="flex-1 overflow-scroll bg-muted/30" >
+        <div className="flex-1 overflow-scroll flex-col bg-muted/30 h-[100%]" >
+        <div className="flex flex-grow h-[100%] w-[100%]">
           {actionItems.filter(v=>v.label === activePanel).map(v=>{
-
+            
             return (
-                <div className={"flex flex-col h-[100%] max-h-[100%]"} key={v.name} >
+                <div className={"flex flex-col h-[100%] max-h-[100%] w-[100%]"} key={v.name} >
                 <v.panel></v.panel>
                 </div>
             )
           })}
         </div>
+        </div>
+        
       </div>
+
     )
   }

@@ -96,7 +96,7 @@ export default async function RootLayout({
       <SpeedInsights /> */}
 
       <GoogleAnalytics />
-      <body className="bg-black">
+      <body className="">
         <GoogleCaptchaWrapper>
           <Providers><Provider session={session}>{children}</Provider></Providers>
         </GoogleCaptchaWrapper>

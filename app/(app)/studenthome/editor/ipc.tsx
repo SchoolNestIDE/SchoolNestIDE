@@ -130,6 +130,7 @@ enum NestProtocol {
     DISCONNECT = 1,
 
 }
+export interface Process { input: (data: string) => void; wait: () => Promise<number>; kill: (signal: number) => Promise<void>; }
 class MessageLoop {
     emulator: any;
     handlers: ((...args: any[]) => void)[];

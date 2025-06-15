@@ -213,10 +213,8 @@ function EmulatorProvider({ children }: { children: React.ReactNode }) {
       u.pathname = "";
       u.protocol = "http:";
 
-      let pName = u.searchParams.get('projectname');
-      if (!pName) {
-        pName = "Default";
-      }
+      let pName = sessionStorage['projectname'];
+      let langType = sessionStorage['langtype'];
       u.search = "";
 
       let initArgs = [u.href.slice(0,-1), pName];

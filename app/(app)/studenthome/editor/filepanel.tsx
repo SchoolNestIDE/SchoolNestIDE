@@ -217,7 +217,7 @@ function FileSystemNode({ path, padding, visibility, root, directory }: {
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", cursor: "pointer", paddingLeft: `${padding}px`, fontSize: root ? "18pt" : "12pt", backgroundColor: selected ? "initial" : "rgba(255,255,255,0.4)",  flexDirection: "row" }} onClick={oClick}>{(directory) ? ((viz ) ? (
+      <div draggable style={{ display: "flex", alignItems: "center", cursor: "pointer", paddingLeft: `${padding}px`, fontSize: root ? "18pt" : "12pt", userSelect: "none", backgroundColor: selected ? "initial" : "rgba(173,216,230,0.4)",  flexDirection: "row" }} onClick={oClick}>{(directory) ? ((viz ) ? (
           <IconArrowDown size="12pt"></IconArrowDown>
         ) : (
           <IconArrowRight size="12pt"></IconArrowRight>
@@ -263,8 +263,8 @@ function FileSystemRoot() {
       }
       let se = globalThis as any;
       let params = new URLSearchParams((se.location as any).search);
-      let projectname = params.get("projectname");
-      let langtype = params.get('langtype');
+      let projectname = sessionStorage['projectname'];
+      let langtype = sessionStorage['langtype'];
       if (!langtype) {
         langtype = "linux"
       }

@@ -15,7 +15,7 @@ furnished to do so, subject to the following conditions:
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+THE SOFTWARE IS PROVIDED "AS HellowIS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
@@ -34,11 +34,12 @@ import { Providers } from './providers';
 import { Editor, NavBarHeader } from './editorContext';
 import Nossr from './nossr';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
-import { FilesIcon, GitBranchIcon, HelpCircleIcon } from 'lucide-react';
+import { FilesIcon, GitBranchIcon, HelpCircleIcon, PlayCircleIcon, PlayIcon } from 'lucide-react';
 import { ActionBar, ActionBarItem } from './actionBar';
 import JavaBeginnerGuide from './HelpPanel';
 import RenderModalDialog from './modal_dialog';
 import { ModalDialogProvider, useModalDialogCtx } from './ModalDialog';
+import RunPanel from './RunPanel';
 const mimeType = require('mime-types');
 
       const channel = new BroadcastChannel('my-app-tab-lock');
@@ -48,6 +49,10 @@ function ModalMightSuspend({ children,check }: {check:(_:any)=>void, children: R
   console.log("hey")
   let qc = use((async () => {
     return new Promise((resolve) => {
+      if (!sessionStorage['projectname'] || !sessionStorage['langtype']) {
+        location.href="/studenthome/"
+        return;
+      }
       let isBlocked = false;
 
       // Listen for messages from other tabs
@@ -59,7 +64,7 @@ function ModalMightSuspend({ children,check }: {check:(_:any)=>void, children: R
         if (event.data === 'tab-alive') {
           console.log(event.source);
           isBlocked = true;
-          resolve(false);
+          resolve("Do not use the editor if another tab with the editor is open.");
         }
         
       }
@@ -72,15 +77,15 @@ function ModalMightSuspend({ children,check }: {check:(_:any)=>void, children: R
       setTimeout(() => {
         if (!isBlocked) {
           // No other tab responded, safe to run the app
-          resolve(true);
+          resolve(null);
         }
       }, 100);
     })
-  })() as Promise<boolean>);
-  if (!qc) {
+  })() as Promise<string>);
+  if (typeof qc === "string") {
     function WithModal() {
       let mdCtx = useModalDialogCtx();
-      mdCtx.setModalContents("Do not use the editor if another tab with the editor is open.");
+      mdCtx.setModalContents(qc);
       mdCtx.setModalVisibility(true);
       
       setInterval(()=>{
@@ -137,13 +142,16 @@ export default function Home() {
       label: "linuxguide"
     }
     , {
-      icon: <div style={{ alignSelf: "end" }}>test</div>
+      icon: <PlayCircleIcon></PlayCircleIcon>,
+      panel: ()=><RunPanel addPanelFunc={pa}></RunPanel>,
+      toTheEnd: true,
+      label: "runpanel"
     }
   ] as ActionBarItem[];
   let [state, setState] = useState(true);
   return (
     <Nossr>
-      <React.Suspense fallback={(<div>Hellow rold</div>)}>
+      <React.Suspense fallback={(<div>Loading...</div>)}>
         <ModalMightSuspend check={setState}>
           <Providers>
 

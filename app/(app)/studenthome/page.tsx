@@ -289,7 +289,7 @@ export default function Page() {
                             <>
                                 {/* <a className="text-black dark:text-white" key={project} href="/">{project}</a> */}
 
-                                <Link style={{ padding: "12px", border: "2px solid white" }} className="text-black dark:text-white" href={`/studenthome/editor?projectname=${project.projectName}&langType=${project.projectType}`} >
+                                <Link style={{ padding: "12px", border: "2px solid white" }} onClick={()=>{sessionStorage['projectname'] = project.projectName; sessionStorage['langtype'] = project.projectType}}className="text-black dark:text-white" href={`/studenthome/editor`} >
                                     {project.projectName}<div style={{ padding: "6pt" }}>{icons[project.projectType]}</div><GithubIntegrationButton project={project}></GithubIntegrationButton>
                                 </Link>
 
