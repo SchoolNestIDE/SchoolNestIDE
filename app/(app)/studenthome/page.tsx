@@ -124,6 +124,7 @@ export default function Page() {
     }
     const createProject = async () => {
         const originalProjects: StorageType = await localForage.getItem('projectList') as StorageType;
+
         let project: Project = {
             projectName: "Default-1",
             projectType: "linux",
@@ -133,11 +134,27 @@ export default function Page() {
             githubBranch: null
         };
 
-        project.projectName = await showPrompt((
-            <>
-                <div>What would you like to name your new project</div>
-            </>
-        )) as string;
+        let projectName: string = "";
+        let projectNameAlreadyFound = true;
+
+        while (projectNameAlreadyFound || projectName === "") {
+            projectName = await showPrompt((
+                <>
+                    <div>What would you like to name your new project</div>
+                </>
+            )) as string;
+            if (projectName === null) return; /* user clicked Cancel on the prompt */
+
+            projectNameAlreadyFound = originalProjects.projects.map((p: Project) => p.projectName).includes(projectName)
+            if (projectNameAlreadyFound) {
+                alert("Error: Project name already exists for this user!");
+            }
+            if (projectName !== "") {
+                projectName = projectName.replace(/[^ -~]+/g, "");
+            }
+        }
+
+        project.projectName = projectName;
 
         await showPrompt((
             <>
@@ -280,9 +297,9 @@ export default function Page() {
 
         return (
             <div className="my-auto h-full">
-                <button className="border rounded-md px-4 py-2 mt-1 text-black dark:text-white bg-neutral-300 dark:bg-neutral-800" onClick={createProject}>Create New Project</button>
+                <button className="border rounded-md px-4 py-2 mt-1 mb-5 text-black dark:text-white bg-neutral-300 dark:bg-neutral-800" onClick={createProject}>Create New Project</button>
 
-                <div className="flex flex-col space-y-1">
+                <div className="flex flex-col space-y-1 max-h-[50dvh] overflow-y-scroll">
 
                     {projectList?.map((project) => {
                         return (
@@ -420,7 +437,7 @@ export default function Page() {
                 </AdvancedSettingsLink>
             ),
             header: <AllProjects />,
-            className: "md:col-span-2",
+            className: "mt-10 w-auto h-[clamp(40dvh, auto, 90dvh)] md:col-span-2",
             icon: <IconClipboardCopy className="h-4 w-4 text-neutral-500" />,
         },
 
@@ -438,7 +455,7 @@ export default function Page() {
                         <FloatingNav />
                         
 
-                        <BentoGrid className="">
+                        <BentoGrid className="flex flex-col justify-center w-[100dvw] h-[100dvh]">
                             {items.map((item, i) => (
                                 <BentoGridItem
                                     key={i}
