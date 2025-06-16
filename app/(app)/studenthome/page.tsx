@@ -222,16 +222,16 @@ export default function Page() {
     function AllProjects() {
         let icons = {
             "java": (
-                <IconCoffee></IconCoffee>
+                <IconCoffee color={"orange"}></IconCoffee>
             ),
             "linux": (
-                <IconTerminal2></IconTerminal2>
+                <IconTerminal2 color={"purple"}></IconTerminal2>
             ),
             "python": (
-                <IconBrandPython></IconBrandPython>
+                <IconBrandPython color={"yellow"}></IconBrandPython>
             ),
             "cpp": (
-                <IconBrandCpp></IconBrandCpp>
+                <IconBrandCpp color={"green"}></IconBrandCpp>
             ),
             "github": (
                 <IconBrandGit></IconBrandGit>
@@ -324,6 +324,22 @@ ModalDialogCtx.setModalVisibility(true);
             return a.projectType > b.projectType ? 1 : -1;
         })
 
+        const headerText = (text: string, color?: string) => {
+            const colorToTailwind = {
+                "red": "text-red-700",
+                "orange": "text-amber-400", /* tested & matches icon */
+                "yellow": "text-yellow-300", /* tested & matches icon */
+                "green": "text-green-700", /* tested & matches icon */
+                "blue": "text-blue-700",
+                "purple": "text-fuchsia-800", /* tested & matches icon */
+            }[color] || "text-gray-700";
+
+            return (<>
+                <h1 className={`ml-2 text-xl tracking-wide font-bold ${colorToTailwind}`}>{text}</h1>
+                <hr />
+            </>);
+        }
+
         let foundCpp = false;
         let foundJava = false;
         let foundLinux = false;
@@ -342,37 +358,25 @@ ModalDialogCtx.setModalVisibility(true);
                                 {(() => {
                                     if (!foundCpp && project.projectType === "cpp") {
                                         foundCpp = true;
-                                        return <>
-                                            <h1>C++</h1>
-                                            <hr />
-                                        </>
+                                        return headerText('C++', 'green');
                                     }
                                 })()}
                                 {(() => {
                                     if (!foundJava && project.projectType === "java") {
                                         foundJava = true;
-                                        return <>
-                                            <h1>Java</h1>
-                                            <hr />
-                                        </>
+                                        return headerText('Java', 'orange');
                                     }
                                 })()}
                                 {(() => {
                                     if (!foundLinux && project.projectType === "linux") {
                                         foundLinux = true;
-                                        return <>
-                                            <h1>Linux</h1>
-                                            <hr />
-                                        </>
+                                        return headerText('Linux', 'purple');
                                     }
                                 })()}
                                 {(() => {
                                     if (!foundPython && project.projectType === "python") {
                                         foundPython = true;
-                                        return <>
-                                            <h1>Python</h1>
-                                            <hr />
-                                        </>
+                                        return headerText('Python', 'yellow');
                                     }
                                 })()}
                                 <Link 
